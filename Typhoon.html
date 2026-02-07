@@ -2,82 +2,100 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>고급 태풍 정보 메이커</title>
+    <title>태풍 상세 정보 메이커</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f4f7f6; }
-        body { font-family: 'Pretendard', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 40px; }
-        .wrapper { width: 100%; max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        h2 { font-size: 1.2rem; color: var(--primary); margin-top: 0; border-left: 4px solid var(--accent); padding-left: 10px; }
+        :root { --primary: #1e3a8a; --accent: #ef4444; --bg: #f8fafc; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
+        .wrapper { width: 100%; max-width: 900px; display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        h2 { font-size: 1.1rem; margin-bottom: 20px; color: var(--primary); border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
         .form-group { margin-bottom: 12px; }
-        label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: #666; }
-        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #1a252f; }
-
-        /* 결과 창 디자인 */
-        #display { background: #2c3e50; color: white; min-height: 400px; position: relative; }
-        .ty-header { background: var(--accent); padding: 10px; text-align: center; font-weight: bold; border-radius: 4px; margin-bottom: 20px; }
-        .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .data-label { color: #bdc3c7; font-size: 0.9rem; }
-        .footer-msg { margin-top: 20px; font-size: 0.8rem; color: #95a5a6; text-align: center; }
+        label { display: block; font-size: 0.8rem; font-weight: bold; color: #475569; margin-bottom: 4px; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem; }
+        textarea { height: 60px; resize: none; }
+        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        
+        /* 리포트 디자인 */
+        #display { background: #ffffff; border: 2px solid var(--primary); }
+        .report-title { background: var(--primary); color: white; padding: 15px; text-align: center; font-size: 1.2rem; font-weight: bold; border-radius: 6px 6px 0 0; margin: -20px -20px 20px -20px; }
+        .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .info-box { padding: 10px; background: #f1f5f9; border-radius: 8px; }
+        .info-label { font-size: 0.75rem; color: #64748b; margin-bottom: 5px; }
+        .info-value { font-size: 1rem; font-weight: bold; color: #1e293b; }
+        .area-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .area-tag { background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; border: 1px solid #fca5a5; }
+        .size-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-size: 0.8rem; margin-left: 5px; }
     </style>
 </head>
 <body>
 
 <div class="wrapper">
-    <!-- 입력부 -->
     <div class="card">
-        <h2>정보 입력</h2>
-        <div class="form-group"><label>태풍명</label><input type="text" id="inName" placeholder="예: 제11호 힌남노"></div>
-        <div class="form-group"><label>현재 위치</label><input type="text" id="inLoc" placeholder="서귀포 남남서쪽 약 400km 부근"></div>
-        <div class="form-group"><label>이동 방향</label><input type="text" id="inDir" placeholder="북북동"></div>
-        <div class="form-group"><label>이동 속도 (km/h)</label><input type="number" id="inSpeed" placeholder="30"></div>
-        <div class="form-group"><label>중심 기압 (hPa)</label><input type="number" id="inPres" placeholder="945"></div>
-        <div class="form-group"><label>최대 풍속 (m/s)</label><input type="number" id="inWind" placeholder="45"></div>
+        <h2>🌀 태풍 데이터 입력</h2>
+        <div class="form-group"><label>태풍 이름</label><input type="text" id="inName" placeholder="제11호 힌남노(HINNAMNOR)"></div>
         <div class="form-group">
-            <label>강도 규모</label>
-            <select id="inLevel">
-                <option value="중">중</option><option value="강">강</option>
-                <option value="매우강">매우 강</option><option value="초강력">초강력</option>
+            <label>태풍 크기 (강풍반경)</label>
+            <select id="inSize">
+                <option value="소형 (300km 미만)">소형 (300km 미만)</option>
+                <option value="중형 (300~500km)">중형 (300~500km)</option>
+                <option value="대형 (500~800km)">대형 (500~800km)</option>
+                <option value="초대형 (800km 이상)">초대형 (800km 이상)</option>
             </select>
         </div>
-        <button onclick="update()">브리핑 생성하기</button>
+        <div class="form-group"><label>중심기압 / 풍속</label>
+            <div style="display:flex; gap:5px;">
+                <input type="number" id="inPres" placeholder="hPa">
+                <input type="number" id="inWind" placeholder="m/s">
+            </div>
+        </div>
+        <div class="form-group"><label>현재 위치</label><input type="text" id="inLoc" placeholder="예: 일본 오키나와 서남서쪽 부근"></div>
+        <div class="form-group"><label>영향 지역 (쉼표로 구분)</label><input type="text" id="inAreas" placeholder="제주도, 남해안, 부산, 울산"></div>
+        <div class="form-group"><label>비고 및 주의사항</label><textarea id="inNote" placeholder="강한 바람과 폭우에 주의가 필요합니다."></textarea></div>
+        <button onclick="makeReport()">보고서 생성</button>
     </div>
 
-    <!-- 출력부 -->
     <div class="card" id="display">
-        <div class="ty-header">태풍 정보 통보문</div>
-        <div id="outContent">
-            <p style="text-align:center; color:#95a5a6; margin-top:100px;">정보를 입력하고 버튼을 눌러주세요.</p>
+        <div class="report-title">태풍 정보 요약 보고서</div>
+        <div id="result">
+            <p style="text-align:center; color:#94a3b8; padding-top:100px;">좌측에 정보를 입력해 주세요.</p>
         </div>
-        <div class="footer-msg">※ 본 정보는 가상의 데이터입니다.</div>
     </div>
 </div>
 
 <script>
-    function update() {
-        const data = {
-            name: document.getElementById('inName').value || '-',
-            loc: document.getElementById('inLoc').value || '-',
-            dir: document.getElementById('inDir').value || '-',
-            speed: document.getElementById('inSpeed').value || '0',
-            pres: document.getElementById('inPres').value || '0',
-            wind: document.getElementById('inWind').value || '0',
-            level: document.getElementById('inLevel').value
-        };
+    function makeReport() {
+        const name = document.getElementById('inName').value || '미정';
+        const size = document.getElementById('inSize').value;
+        const pres = document.getElementById('inPres').value || '-';
+        const wind = document.getElementById('inWind').value || '-';
+        const loc = document.getElementById('inLoc').value || '정보 없음';
+        const areas = document.getElementById('inAreas').value.split(',').filter(a => a.trim() !== '');
+        const note = document.getElementById('inNote').value || '특이사항 없음';
 
+        let areaHtml = areas.map(a => `<span class="area-tag">📍 ${a.trim()}</span>`).join('');
+        
         const html = `
-            <div class="data-row"><span class="data-label">태풍 명칭</span><span>${data.name}</span></div>
-            <div class="data-row"><span class="data-label">현재 위치</span><span>${data.loc}</span></div>
-            <div class="data-row"><span class="data-label">진행 방향</span><span>${data.dir}</span></div>
-            <div class="data-row"><span class="data-label">이동 속도</span><span>${data.speed} km/h</span></div>
-            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.2); margin:15px 0;">
-            <div class="data-row"><span class="data-label">중심 기압</span><span>${data.pres} hPa</span></div>
-            <div class="data-row"><span class="data-label">최대 풍속</span><span>${data.wind} m/s</span></div>
-            <div class="data-row"><span class="data-label">강도 규모</span><span style="color:#f1c40f; font-weight:bold;">${data.level}</span></div>
+            <div style="margin-bottom:20px;">
+                <div class="info-label">태풍 명칭 및 크기</div>
+                <div class="info-value" style="font-size:1.4rem; color:var(--accent);">${name} <span class="size-badge">${size}</span></div>
+            </div>
+            <div class="grid-info">
+                <div class="info-box"><div class="info-label">중심 기압</div><div class="info-value">${pres} hPa</div></div>
+                <div class="info-box"><div class="info-label">최대 풍속</div><div class="info-value">${wind} m/s</div></div>
+            </div>
+            <div class="info-box" style="margin-bottom:20px;">
+                <div class="info-label">현재 위치</div><div class="info-value" style="font-size:0.95rem;">${loc}</div>
+            </div>
+            <div style="margin-bottom:20px;">
+                <div class="info-label">⚠️ 주요 영향 및 경보 지역</div>
+                <div class="area-list">${areaHtml || '지정된 지역 없음'}</div>
+            </div>
+            <div class="info-box" style="border-left: 4px solid var(--accent);">
+                <div class="info-label">기상청 주의보</div>
+                <div style="font-size:0.9rem; line-height:1.5;">${note}</div>
+            </div>
         `;
-        document.getElementById('outContent').innerHTML = html;
+        document.getElementById('result').innerHTML = html;
     }
 </script>
 
