@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>고급 태풍 정보 메이커</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f4f7f6; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 40px; }
+        .wrapper { width: 100%; max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        h2 { font-size: 1.2rem; color: var(--primary); margin-top: 0; border-left: 4px solid var(--accent); padding-left: 10px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: #666; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #1a252f; }
+
+        /* 결과 창 디자인 */
+        #display { background: #2c3e50; color: white; min-height: 400px; position: relative; }
+        .ty-header { background: var(--accent); padding: 10px; text-align: center; font-weight: bold; border-radius: 4px; margin-bottom: 20px; }
+        .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .data-label { color: #bdc3c7; font-size: 0.9rem; }
+        .footer-msg { margin-top: 20px; font-size: 0.8rem; color: #95a5a6; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <!-- 입력부 -->
+    <div class="card">
+        <h2>정보 입력</h2>
+        <div class="form-group"><label>태풍명</label><input type="text" id="inName" placeholder="예: 제11호 힌남노"></div>
+        <div class="form-group"><label>현재 위치</label><input type="text" id="inLoc" placeholder="서귀포 남남서쪽 약 400km 부근"></div>
+        <div class="form-group"><label>이동 방향</label><input type="text" id="inDir" placeholder="북북동"></div>
+        <div class="form-group"><label>이동 속도 (km/h)</label><input type="number" id="inSpeed" placeholder="30"></div>
+        <div class="form-group"><label>중심 기압 (hPa)</label><input type="number" id="inPres" placeholder="945"></div>
+        <div class="form-group"><label>최대 풍속 (m/s)</label><input type="number" id="inWind" placeholder="45"></div>
+        <div class="form-group">
+            <label>강도 규모</label>
+            <select id="inLevel">
+                <option value="중">중</option><option value="강">강</option>
+                <option value="매우강">매우 강</option><option value="초강력">초강력</option>
+            </select>
+        </div>
+        <button onclick="update()">브리핑 생성하기</button>
+    </div>
+
+    <!-- 출력부 -->
+    <div class="card" id="display">
+        <div class="ty-header">태풍 정보 통보문</div>
+        <div id="outContent">
+            <p style="text-align:center; color:#95a5a6; margin-top:100px;">정보를 입력하고 버튼을 눌러주세요.</p>
+        </div>
+        <div class="footer-msg">※ 본 정보는 가상의 데이터입니다.</div>
+    </div>
+</div>
+
+<script>
+    function update() {
+        const data = {
+            name: document.getElementById('inName').value || '-',
+            loc: document.getElementById('inLoc').value || '-',
+            dir: document.getElementById('inDir').value || '-',
+            speed: document.getElementById('inSpeed').value || '0',
+            pres: document.getElementById('inPres').value || '0',
+            wind: document.getElementById('inWind').value || '0',
+            level: document.getElementById('inLevel').value
+        };
+
+        const html = `
+            <div class="data-row"><span class="data-label">태풍 명칭</span><span>${data.name}</span></div>
+            <div class="data-row"><span class="data-label">현재 위치</span><span>${data.loc}</span></div>
+            <div class="data-row"><span class="data-label">진행 방향</span><span>${data.dir}</span></div>
+            <div class="data-row"><span class="data-label">이동 속도</span><span>${data.speed} km/h</span></div>
+            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.2); margin:15px 0;">
+            <div class="data-row"><span class="data-label">중심 기압</span><span>${data.pres} hPa</span></div>
+            <div class="data-row"><span class="data-label">최대 풍속</span><span>${data.wind} m/s</span></div>
+            <div class="data-row"><span class="data-label">강도 규모</span><span style="color:#f1c40f; font-weight:bold;">${data.level}</span></div>
+        `;
+        document.getElementById('outContent').innerHTML = html;
+    }
+</script>
+
+</body>
+</html>
