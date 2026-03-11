@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ATCF to HURDAT2 Converter</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; line-height: 1.6; }
+        textarea { width: 100%; height: 200px; font-family: monospace; margin-top: 10px; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; cursor: pointer; margin: 10px 0; }
+        .container { max-width: 900px; margin: auto; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>ATCF to HURDAT2 변환기</h2>
+        <p>ATCF b-deck 데이터를 아래에 붙여넣으세요:</p>
+        <textarea id="atcfInput" placeholder="AL, 09, 2021082800, 03, BEST, 0, 150N, 590W, 45, 1006..."></textarea>
+        
+        <button onclick="convertATCF()">HURDAT2로 변환</button>
+        
+        <p>변환 결과 (HURDAT2):</p>
+        <textarea id="hurdatOutput" readonly></textarea>
+    </div>
+
+    <script>
+        function convertATCF() {
+            const input = document.getElementById('atcfInput').value.trim();
+            if (!input) return alert("데이터를 입력하세요.");
+
+            const lines = input.split('\n');
+            const storms = {};
+
+            lines.forEach(line => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length < 10) return;
+
+                const basin = parts[0];
+                const cy = parts[1].padStart(2, '0');
+                const dtg = parts[2]; // YYYYMMDDHH
+                const year = dtg.substring(0, 4);
+                const stormId = `${basin}${cy}${year}`;
+                const name = parts[27] || "UNNAMED"; // ATCF 28번째 필드
+
+                if (!storms[stormId]) {
+                    storms[stormId] = { id: stormId, name: name, entries: [] };
+                }
+
+                // HURDAT2 데이터 라인 생성
+                const date = dtg.substring(0, 8);
+                const time = dtg.substring(8, 10) + "00";
+                const recordId = ""; // 보통 공백
+                const status = parts[10] || "TS";
+                const lat = (parseFloat(parts[6]) / 10).toFixed(1) + parts[6].slice(-1);
+                const lon = (parseFloat(parts[7]) / 10).toFixed(1) + parts[7].slice(-1);
+                const vmax = parts[8];
+                const mslp = parts[9];
+                
+                // 풍속 반경(34, 50, 64kt) 처리 (없으면 0)
+                const radii = parts.slice(13, 25).map(r => r || "0").join(", ");
+
+                const entry = `${date}, ${time}, ${recordId}, ${status}, ${lat}, ${lon}, ${vmax}, ${mslp}, ${radii}`;
+                storms[stormId].entries.push(entry);
+            });
+
+            let finalOutput = "";
+            for (const id in storms) {
+                const storm = storms[id];
+                // 헤더: ID, Name, Entry Count
+                finalOutput += `${storm.id}, ${storm.name.toUpperCase()}, ${storm.entries.length},\n`;
+                finalOutput += storm.entries.join('\n') + '\n';
+            }
+
+            document.getElementById('hurdatOutput').value = finalOutput;
+        }
+    </script>
+</body>
+</html>
