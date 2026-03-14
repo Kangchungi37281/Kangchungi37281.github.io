@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATCF 랜덤 마이저 v2.1.2 (Final)</title>
+    <style>
+        :root { --primary: #4dabf7; --bg: #1a1a1b; --card: #2b2d2e; --accent: #ffca28; --text: #eee; --success: #28a745; --danger: #ff6b6b; }
+        body { font-family: 'Pretendard', 'Consolas', monospace; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.4; margin: 0; }
+        .container { max-width: 1150px; margin: 10px auto; background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #444; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3d3f41; padding-bottom: 10px; margin-bottom: 15px; }
+        h1 { color: var(--primary); margin: 0; font-size: 1.4rem; }
+        .version-tag { font-size: 0.65rem; background: #444; padding: 2px 8px; border-radius: 4px; color: #aaa; margin-left: 8px; }
+
+        /* RSMC Converter 섹션 */
+        .converter-box { background: #222; border: 1px dashed var(--primary); padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .conv-title { font-size: 0.85rem; font-weight: bold; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .section-title { font-size: 0.8rem; margin-bottom: 5px; color: var(--primary); font-weight: bold; display: flex; justify-content: space-between; }
+        
+        textarea { width: 100%; height: 220px; background: #000; color: #71f08d; border: 1px solid #444; padding: 10px; box-sizing: border-box; font-size: 11px; border-radius: 6px; resize: none; font-family: 'Consolas', monospace; outline: none; }
+        
+        .editor-container { border: 1px solid #555; border-radius: 6px; overflow: hidden; background: #0c0c0c; display: flex; flex-direction: column; }
+        .editor-toolbar { background: #333; padding: 5px 10px; display: flex; gap: 8px; border-bottom: 1px solid #444; }
+        .editor-btn { background: #555; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold; }
+        
+        .controls { background: #3d3f41; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #4d4f51; padding-bottom: 8px; }
+        .row:last-child { border-bottom: none; padding-bottom: 0; }
+        
+        .option-item { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .input-field { background: #1a1a1b; color: #fff; border: 1px solid #666; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; outline: none; }
+        
+        .tag-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .tag { background: var(--primary); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; display: flex; align-items: center; gap: 4px; }
+        
+        .btn-run-group { display: flex; align-items: center; gap: 12px; }
+        button.main-run { padding: 12px 35px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.95rem; }
+        button.main-run:hover { background: #339af0; }
+        .status { color: var(--accent); font-weight: bold; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🌀 ATCF 랜덤 마이저 <span class="version-tag">v2.1.2 Final Update</span></h1>
+        <div style="display:flex; gap:10px;">
+            <div class="lang-switch" onclick="toggleLang()" style="cursor:pointer; font-size:0.75rem; background:#444; padding:4px 10px; border-radius:15px;">EN/KO</div>
+        </div>
+    </div>
+
+    <!-- RSMC to ATCF Converter -->
+    <div class="converter-box">
+        <div class="conv-title">🛠️ <span id="ui-conv-title">RSMC to ATCF 변환기 (오류 주의)</span></div>
+        <textarea id="rsmcInput" style="height: 80px;" placeholder="Paste RSMC Best Track data here..."></textarea>
+        <button class="editor-btn" onclick="convertRSMCToATCF()" style="margin-top:8px; background:var(--primary);" id="ui-conv-btn">ATCF로 변환하여 입력창에 넣기</button>
+    </div>
+
+    <div class="main-grid">
+        <div>
+            <div class="section-title"><span id="ui-input-label">원본 데이터 (Input)</span></div>
+            <textarea id="inputData" placeholder="ATCF data..."></textarea>
+        </div>
+        <div>
+            <div class="section-title">
+                <span id="ui-editor-label">ATCF 코드 에디터 (Editor)</span>
+                <span id="editor-status" style="color:var(--accent); font-size:0.7rem;"></span>
+            </div>
+            <div class="editor-container">
+                <div class="editor-toolbar">
+                    <button class="editor-btn" onclick="applyEditorToInput()" id="ui-apply-btn">원본으로 보내기</button>
+                    <button class="editor-btn" onclick="copyEditor()" id="ui-copy-btn" style="background: var(--success);">복사</button>
+                </div>
+                <textarea id="codeEditor" spellcheck="false" placeholder="Output..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="row">
+            <label class="option-item">🆔 <span id="ui-s-id">ID</span></label>
+            <input type="text" id="stormID" class="input-field" style="width:40px" placeholder="01">
+            <label class="option-item" style="margin-left:10px">🏷️ <span id="ui-s-name">이름</span></label>
+            <input type="text" id="stormName" class="input-field" style="width:100px" placeholder="NAME">
+        </div>
+        <div class="row">
+            <label class="option-item"><input type="checkbox" id="shuffleWind" checked> <span id="ui-wind">풍속</span></label>
+            <label class="option-item" style="color:var(--accent)"><input type="checkbox" id="genWindMode" onchange="toggleInputs()"> <span id="ui-gen1">생성</span></label>
+            <div id="windRange" style="display:none;"> [ <input type="number" id="minWind" class="input-field" style="width:50px" value="20"> ~ <input type="number" id="maxWind" class="input-field" style="width:50px" value="150"> kt ] </div>
+        </div>
+        <div class="row">
+            <label class="option-item"><input type="checkbox" id="shufflePressure" checked> <span id="ui-press">기압</span></label>
+            <label class="option-item" style="color:var(--accent)"><input type="checkbox" id="genPressMode" onchange="toggleInputs()"> <span id="ui-gen2">생성</span></label>
+            <div id="pressRange" style="display:none;"> [ <input type="number" id="minPress" class="input-field" style="width:60px" value="900"> ~ <input type="number" id="maxPress" class="input-field" style="width:60px" value="1010"> hPa ] </div>
+        </div>
+        <div class="row">
+            <label class="option-item"><input type="checkbox" id="shuffleType" checked> <span id="ui-type">타입</span></label>
+            <label class="option-item" style="color:var(--accent)"><input type="checkbox" id="genTypeMode" onchange="toggleInputs()"> <span id="ui-gen3">생성</span></label>
+            <div id="typeManager" style="display:none; width:100%;">
+                <input type="text" id="newTypeInput" class="input-field" placeholder="Add..." style="width:80px">
+                <button onclick="addType()" class="editor-btn">+</button>
+                <div id="tagContainer" class="tag-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-run-group">
+        <button class="main-run" onclick="processData()" id="ui-run-btn">랜덤 마이징 실행</button>
+        <span id="status" class="status"></span>
+    </div>
+</div>
+
+<script>
+    let currentLang = 'ko';
+    let stormTypeTags = ["TD", "TS", "TY", "ST"];
+    const langData = {
+        ko: { conv_t: "RSMC to ATCF 변환기(오류 주의)", conv_b: "ATCF로 변환하여 입력창에 넣기", input: "원본 데이터 (Input)", editor: "코드 에디터 (Editor)", apply: "원본으로 보내기", copy: "복사", s_id: "ID 변경", s_name: "이름 변경", wind: "풍속", press: "기압", type: "타입", gen: "생성", run: "랜덤 마이징 실행", done: "성공!", err: "변환 실패: 형식을 확인하세요." },
+        en: { conv_t: "RSMC to ATCF Converter(many errors)", conv_b: "Convert to ATCF & Send to Input", input: "Original Data", editor: "Code Editor", apply: "Send to Input", copy: "Copy", s_id: "ID", s_name: "Name", wind: "Wind", press: "Press", type: "Type", gen: "Gen", run: "Run Randomizer", done: "Done!", err: "Error: Check Format." }
+    };
+
+    function toggleLang() {
+        currentLang = currentLang === 'ko' ? 'en' : 'ko';
+        const d = langData[currentLang];
+        document.getElementById('ui-conv-title').innerText = d.conv_t;
+        document.getElementById('ui-conv-btn').innerText = d.conv_b;
+        document.getElementById('ui-input-label').innerText = d.input;
+        document.getElementById('ui-editor-label').innerText = d.editor;
+        document.getElementById('ui-apply-btn').innerText = d.apply;
+        document.getElementById('ui-copy-btn').innerText = d.copy;
+        document.getElementById('ui-s-id').innerText = d.s_id;
+        document.getElementById('ui-s-name').innerText = d.s_name;
+        document.getElementById('ui-wind').innerText = d.wind;
+        document.getElementById('ui-press').innerText = d.press;
+        document.getElementById('ui-type').innerText = d.type;
+        document.getElementById('ui-gen1').innerText = d.gen;
+        document.getElementById('ui-gen2').innerText = d.gen;
+        document.getElementById('ui-gen3').innerText = d.gen;
+        document.getElementById('ui-run-btn').innerText = d.run;
+    }
+
+    // [신규] RSMC to ATCF 변환 로직
+    function convertRSMCToATCF() {
+        const raw = document.getElementById('rsmcInput').value.trim();
+        if(!raw) return;
+        try {
+            const lines = raw.split('\n');
+            let atcfLines = [];
+            lines.forEach(line => {
+                const p = line.split(/\s+/);
+                if(p.length >= 6) {
+                    // 기본 RSMC 구조 가공 (임시 ID 01, WP 분지 고정)
+                    const date = p[0].replace(/\//g, '');
+                    const lat = p[2].replace('N', '');
+                    const lon = p[3].replace('E', '');
+                    const press = p[4];
+                    const wind = p[5];
+                    atcfLines.push(`WP, 01, ${date}, , BEST, 0, ${lat}N, ${lon}E, ${wind}, ${press}, XX, 34, NEQ, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NAME`);
+                }
+            });
+            document.getElementById('inputData').value = atcfLines.join('\n');
+            document.getElementById('rsmcInput').value = "";
+        } catch(e) { alert(langData[currentLang].err); }
+    }
+
+    function initTags() {
+        const c = document.getElementById('tagContainer'); c.innerHTML = '';
+        stormTypeTags.forEach(t => {
+            const s = document.createElement('div'); s.className='tag';
+            s.innerHTML = `${t} <span onclick="removeType('${t}')" style="cursor:pointer">×</span>`;
+            c.appendChild(s);
+        });
+    }
+    function addType() { const i = document.getElementById('newTypeInput'); if(i.value) { stormTypeTags.push(i.value.toUpperCase()); initTags(); i.value=''; } }
+    function removeType(t) { stormTypeTags = stormTypeTags.filter(x => x !== t); initTags(); }
+    function toggleInputs() {
+        document.getElementById('windRange').style.display = document.getElementById('genWindMode').checked ? 'inline' : 'none';
+        document.getElementById('pressRange').style.display = document.getElementById('genPressMode').checked ? 'inline' : 'none';
+        document.getElementById('typeManager').style.display = document.getElementById('genTypeMode').checked ? 'block' : 'none';
+    }
+
+    function shuffle(arr) {
+        let a = [...arr];
+        for(let i=a.length-1; i>0; i--) { let j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+        return a;
+    }
+
+    function processData() {
+        const input = document.getElementById('inputData').value.trim();
+        if(!input) return;
+        const newID = document.getElementById('stormID').value.trim();
+        const newName = document.getElementById('stormName').value.trim().toUpperCase();
+        
+        let rows = input.split('\n').filter(l=>l.trim()).map(l=>l.split(',').map(i=>i.trim()));
+        let wPool = shuffle(rows.map(r=>r));
+        let pPool = shuffle(rows.map(r=>r));
+        let tPool = shuffle(rows.map(r=>r));
+
+        const res = rows.map((row, i) => {
+            let r = [...row];
+            if(newID) r[1] = newID;
+            if(newName) r[r.length-1] = newName;
+            if(document.getElementById('shuffleWind').checked) {
+                if(document.getElementById('genWindMode').checked) {
+                    let min = parseInt(document.getElementById('minWind').value);
+                    let max = parseInt(document.getElementById('maxWind').value);
+                    r[8] = (Math.round((Math.floor(Math.random()*(max-min+1))+min)/5)*5).toString();
+                } else r[8] = wPool[i][8];
+            }
+            if(document.getElementById('shufflePressure').checked) {
+                if(document.getElementById('genPressMode').checked) {
+                    let min = parseInt(document.getElementById('minPress').value);
+                    let max = parseInt(document.getElementById('maxPress').value);
+                    r[9] = (Math.floor(Math.random()*(max-min+1))+min).toString();
+                } else r[9] = pPool[i][9];
+            }
+            if(document.getElementById('shuffleType').checked) {
+                if(document.getElementById('genTypeMode').checked) r[10] = stormTypeTags[Math.floor(Math.random()*stormTypeTags.length)] || "TS";
+                else r[10] = tPool[i][10];
+            }
+            return r.join(', ');
+        });
+        document.getElementById('codeEditor').value = res.join('\n');
+        document.getElementById('status').innerText = langData[currentLang].done;
+    }
+
+    function applyEditorToInput() { document.getElementById('inputData').value = document.getElementById('codeEditor').value; }
+    function copyEditor() { const e = document.getElementById('codeEditor'); e.select(); document.execCommand('copy'); }
+    initTags();
+</script>
+</body>
+</html>
