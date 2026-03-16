@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ATCF Full-Field Editor & Manager</title>
+    <style>
+        :root { --bg: #f4f7f9; --panel: #ffffff; --primary: #2c3e50; --accent: #3498db; --edit: #f39c12; }
+        body { font-family: 'Consolas', 'Malgun Gothic', monospace; background: var(--bg); padding: 20px; font-size: 13px; }
+        .container { max-width: 1300px; margin: auto; background: var(--panel); padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { font-family: sans-serif; text-align: center; color: var(--primary); margin-bottom: 20px; }
+        
+        .top-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #eef2f7; border-radius: 8px; border: 1px solid #d1d9e4; }
+        .import-area { display: flex; align-items: center; gap: 10px; }
+        .file-input { display: none; }
+        .custom-file-upload { background: #34495e; color: white; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
+        .section-title { font-weight: bold; margin-top: 15px; margin-bottom: 8px; border-left: 4px solid var(--accent); padding-left: 8px; color: var(--primary); font-family: sans-serif; }
+        .grid-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; background: #fcfcfc; padding: 15px; border: 1px solid #eee; border-radius: 5px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 11px; color: #7f8c8d; margin-bottom: 3px; }
+        input, select { padding: 6px; border: 1px solid #ccc; border-radius: 3px; background: white; }
+
+        .radii-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+        .radii-box { background: #fff1f1; padding: 10px; border-radius: 5px; border: 1px solid #ffdada; }
+
+        .btn-area { margin-top: 25px; display: flex; gap: 10px; }
+        button { flex: 1; padding: 12px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; color: white; transition: 0.2s; }
+        .add-btn { background: var(--accent); }
+        .update-btn { background: var(--edit); display: none; } /* 수정 모드 전용 */
+        .export-btn { background: #27ae60; }
+        .clear-btn { background: #e74c3c; }
+        button:hover { opacity: 0.9; }
+
+        .log-area { margin-top: 25px; max-height: 500px; overflow-y: auto; border: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 11px; table-layout: fixed; }
+        th { background: #34495e; color: white; padding: 10px; position: sticky; top: 0; z-index: 10; }
+        td { border: 1px solid #ddd; padding: 8px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .raw-text { text-align: left; font-weight: bold; color: #c0392b; font-size: 12px; }
+        tr.editing { background-color: #fff9e6; outline: 2px solid var(--edit); }
+        
+        .action-btns { display: flex; gap: 4px; justify-content: center; }
+        .small-btn { padding: 4px 8px; font-size: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌀 ATCF Professional Database Editor</h1>
+
+    <div class="top-controls">
+        <div class="import-area">
+            <label for="file-upload" class="custom-file-upload">📂 파일 불러오기 (.dat / .txt)</label>
+            <input id="file-upload" class="file-input" type="file" accept=".dat,.txt" onchange="importATCF(event)">
+            <span id="file-info" style="margin-left:10px; font-size: 12px; color: #666;">파일을 선택하세요.</span>
+        </div>
+        <div style="font-size: 11px; color: #e67e22; font-weight: bold;">※ 행을 수정하면 기존 위치의 데이터가 변경됩니다.</div>
+    </div>
+
+    <div class="section-title" id="form-title">1. New Record (데이터 입력)</div>
+    <div class="grid-inputs">
+        <input type="hidden" id="edit-index" value="-1">
+        <div class="input-group"><label>BASIN</label><select id="basin"><option value="WP">WP</option><option value="AL">AL</option><option value="EP">EP</option><option value="IO">IO</option></select></div>
+        <div class="input-group"><label>CY (Num)</label><input type="number" id="cy" value="01"></div>
+        <div class="input-group"><label>YYYYMMDDHH</label><input type="text" id="dt" placeholder="2024090112"></div>
+        <div class="input-group"><label>Lat (deg)</label><input type="text" id="lat" value="15.0"></div>
+        <div class="input-group"><label>Lon (deg)</label><input type="text" id="lon" value="130.0"></div>
+        <div class="input-group"><label>VMAX (kts)</label><input type="number" id="vmax" value="65"></div>
+        <div class="input-group"><label>MSLP (hPa)</label><input type="number" id="mslp" value="975"></div>
+        <div class="input-group">
+            <label>TYPE</label>
+            <select id="subtype">
+                <option value="TY">TY</option><option value="TD">TD</option><option value="TS">TS</option><option value="ST">ST</option>
+                <option value="TC">TC</option><option value="HU">HU</option><option value="SD">SD</option><option value="SS">SS</option>
+                <option value="EX">EX</option><option value="MD">MD</option><option value="IN">IN</option><option value="DS">DS</option>
+                <option value="LO">LO</option><option value="WV">WV</option><option value="ET">ET</option><option value="DB">DB</option>
+            </select>
+        </div>
+        <div class="input-group"><label>Name</label><input type="text" id="tcname" value="NONAME"></div>
+    </div>
+
+    <div class="radii-grid">
+        <div class="radii-box">
+            <label>34kts Radii (NE, SE, SW, NW)</label>
+            <div style="display:flex;gap:2px;margin-top:5px">
+                <input id="r34_1" type="number" value="100" style="width:25%"><input id="r34_2" type="number" value="100" style="width:25%">
+                <input id="r34_3" type="number" value="80" style="width:25%"><input id="r34_4" type="number" value="80" style="width:25%">
+            </div>
+        </div>
+        <div class="radii-box" style="background:#f0f8ff; border-color:#bcdffb">
+            <label>Params (RMW, Eye)</label>
+            <div style="display:flex;gap:2px;margin-top:5px">
+                <input id="rmw" type="number" value="25" title="RMW" style="width:50%"><input id="eye" type="number" value="20" title="Eye" style="width:50%">
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-area">
+        <button id="add-btn" class="add-btn" onclick="saveEntry()">목록에 추가 (Add Line)</button>
+        <button id="update-btn" class="update-btn" onclick="saveEntry()">선택한 행 수정 완료 (Update)</button>
+        <button class="export-btn" onclick="exportDAT()">파일 내보내기 (.DAT)</button>
+        <button class="clear-btn" onclick="clearAll()">리스트 비우기</button>
+    </div>
+
+    <div class="log-area">
+        <table>
+            <thead>
+                <tr>
+                    <th width="40">No</th>
+                    <th width="80%">ATCF Raw Record (B-Deck Format)</th>
+                    <th width="120">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="dbBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let entries = [];
+
+    // [불러오기]
+    function importATCF(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const lines = e.target.result.split(/\r?\n/);
+            lines.forEach(line => { if (line.trim().length > 20) entries.push(line.trim()); });
+            document.getElementById('file-info').innerText = `${file.name} (${lines.length} lines loaded)`;
+            render();
+        };
+        reader.readAsText(file);
+    }
+
+    // [데이터 파싱 및 저장]
+    function saveEntry() {
+        const idx = parseInt(document.getElementById('edit-index').value);
+        
+        const d = {
+            basin: document.getElementById('basin').value.trim(),
+            cy: document.getElementById('cy').value.toString().padStart(2, '0'),
+            dt: document.getElementById('dt').value.trim(),
+            lat: formatCoord(document.getElementById('lat').value, false),
+            lon: formatCoord(document.getElementById('lon').value, true),
+            vmax: document.getElementById('vmax').value.toString().padStart(3),
+            mslp: document.getElementById('mslp').value.toString().padStart(4),
+            type: document.getElementById('subtype').value,
+            name: document.getElementById('tcname').value.toUpperCase(),
+            rmw: document.getElementById('rmw').value.toString().padStart(3, '0'),
+            eye: document.getElementById('eye').value.toString().padStart(3, '0'),
+            r34: [
+                document.getElementById('r34_1').value.padStart(4), document.getElementById('r34_2').value.padStart(4),
+                document.getElementById('r34_3').value.padStart(4), document.getElementById('r34_4').value.padStart(4)
+            ].join(', ')
+        };
+
+        const newLine = `${d.basin}, ${d.cy}, ${d.dt}, 03, BEST, 000, ${d.lat}, ${d.lon}, ${d.vmax}, ${d.mslp}, ${d.type},  34, AAA, ${d.r34}, 1010,  150, ${d.rmw}, ${d.eye},   0,    ,    ,    ,    , ${d.name},`;
+
+        if (idx === -1) {
+            entries.push(newLine);
+        } else {
+            entries[idx] = newLine;
+            cancelEdit();
+        }
+        render();
+    }
+
+    // [수정 모드로 전환]
+    function editRow(index) {
+        const line = entries[index];
+        const f = line.split(',').map(s => s.trim());
+        
+        // 폼에 값 채우기 (ATCF 필드 순서 기반 역추적)
+        document.getElementById('basin').value = f[0];
+        document.getElementById('cy').value = parseInt(f[1]);
+        document.getElementById('dt').value = f[2];
+        document.getElementById('lat').value = parseCoord(f[6]);
+        document.getElementById('lon').value = parseCoord(f[7]);
+        document.getElementById('vmax').value = parseInt(f[8]);
+        document.getElementById('mslp').value = parseInt(f[9]);
+        document.getElementById('subtype').value = f[10];
+        document.getElementById('tcname').value = f[f.length - 2] || "NONAME";
+        document.getElementById('r34_1').value = parseInt(f[13]);
+        document.getElementById('r34_2').value = parseInt(f[14]);
+        document.getElementById('r34_3').value = parseInt(f[15]);
+        document.getElementById('r34_4').value = parseInt(f[16]);
+        document.getElementById('rmw').value = parseInt(f[19]);
+        document.getElementById('eye').value = parseInt(f[20]);
+
+        // UI 상태 변경
+        document.getElementById('edit-index').value = index;
+        document.getElementById('form-title').innerText = `✏️ Editing Record No. ${index + 1}`;
+        document.getElementById('add-btn').style.display = 'none';
+        document.getElementById('update-btn').style.display = 'block';
+        
+        render();
+    }
+
+    function cancelEdit() {
+        document.getElementById('edit-index').value = "-1";
+        document.getElementById('form-title').innerText = "1. New Record (데이터 입력)";
+        document.getElementById('add-btn').style.display = 'block';
+        document.getElementById('update-btn').style.display = 'none';
+    }
+
+    // [포맷팅 함수들]
+    function formatCoord(val, isLon) {
+        if (typeof val === 'string' && (val.endsWith('N') || val.endsWith('E'))) return val; // 이미 포맷된 경우
+        let num = parseFloat(val);
+        let suffix = isLon ? (num >= 0 ? 'E' : 'W') : (num >= 0 ? 'N' : 'S');
+        return Math.round(Math.abs(num) * 10).toString().padStart(isLon ? 4 : 3, '0') + suffix;
+    }
+
+    function parseCoord(str) {
+        if (!str) return 0;
+        let val = parseFloat(str.replace(/[NSEW]/g, '')) / 10;
+        if (str.includes('S') || str.includes('W')) val *= -1;
+        return val;
+    }
+
+    function render() {
+        const tbody = document.getElementById('dbBody');
+        const editIdx = parseInt(document.getElementById('edit-index').value);
+        tbody.innerHTML = entries.map((line, i) => `
+            <tr class="${i === editIdx ? 'editing' : ''}">
+                <td>${i+1}</td>
+                <td class="raw-text">${line}</td>
+                <td class="action-btns">
+                    <button onclick="editRow(${i})" class="small-btn" style="background:var(--edit); color:white;">수정</button>
+                    <button onclick="remove(${i})" class="small-btn" style="background:var(--clear-btn); color:white;">삭제</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function remove(i) { if(confirm("삭제하시겠습니까?")) { entries.splice(i, 1); if(i === parseInt(document.getElementById('edit-index').value)) cancelEdit(); render(); } }
+    function clearAll() { if(confirm("전체 초기화하시겠습니까?")) { entries = []; cancelEdit(); render(); } }
+
+    function exportDAT() {
+        if(!entries.length) return alert("데이터가 없습니다.");
+        const blob = new Blob([entries.join('\n')], {type: 'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `ATCF_EDITED_${new Date().getTime()}.dat`;
+        a.click();
+    }
+</script>
+
+</body>
+</html>

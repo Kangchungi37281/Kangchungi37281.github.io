@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>HURDAT2 to ATCF Converter Pro</title>
+    <style>
+        body { font-family: 'Consolas', monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+        .box { max-width: 1000px; margin: auto; background: #252526; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .config-panel { display: flex; gap: 15px; margin-bottom: 15px; background: #333; padding: 15px; border-radius: 4px; align-items: center; }
+        label { font-size: 14px; font-weight: bold; color: #569cd6; }
+        select, input { background: #1e1e1e; color: #fff; border: 1px solid #555; padding: 5px; border-radius: 3px; }
+        textarea { width: 100%; height: 200px; background: #1e1e1e; color: #9cdcfe; border: 1px solid #3e3e42; padding: 10px; box-sizing: border-box; font-size: 13px; }
+        button { background: #0e639c; color: white; border: none; padding: 12px; cursor: pointer; width: 100%; margin: 10px 0; font-weight: bold; border-radius: 4px; }
+        button:hover { background: #1177bb; }
+        #output { background: #000; color: #b5cea8; padding: 15px; border: 1px dashed #569cd6; white-space: pre; overflow-x: auto; font-size: 12px; min-height: 100px; }
+    </style>
+</head>
+<body>
+<div class="box">
+    <h2>HURDAT2 → ATCF (Basin/No. 선택형)</h2>
+    
+    <div class="config-panel">
+        <label>분지(Basin):</label>
+        <select id="basinSelect">
+            <option value="WP">WP (서태평양)</option>
+            <option value="AL">AL (대서양)</option>
+            <option value="EP">EP (동태평양)</option>
+            <option value="CP">CP (중태평양)</option>
+            <option value="IO">IO (인도양)</option>
+            <option value="SH">SH (남반구)</option>
+        </select>
+
+        <label>태풍 번호(CY):</label>
+        <input type="number" id="cyNumber" value="1" min="1" max="99" style="width: 50px;">
+        
+        <span style="font-size: 12px; color: #888;">* 헤더 정보보다 이 설정이 우선 적용됩니다.</span>
+    </div>
+
+    <textarea id="input" placeholder="HURDAT2 데이터를 입력하세요..."></textarea>
+    <button onclick="convert()">ATCF 규격으로 강제 변환</button>
+    <div id="output">변환 대기 중...</div>
+</div>
+
+<script>
+    const typeMap = { 'EX': 'EX', 'LO': 'LO', 'TD': 'TD', 'TS': 'TS', 'HU': 'TY', 'SD': 'SD', 'SS': 'SS' };
+
+    function formatCoord(val) {
+        if (!val) return "    ";
+        let num = parseFloat(val.replace(/[A-Z]/gi, ''));
+        let dir = val.replace(/[0-9.]/g, '').toUpperCase();
+        let formattedNum = Math.round(num * 10).toString();
+        return (formattedNum + dir).padStart(5, ' ');
+    }
+
+    function convert() {
+        const input = document.getElementById('input').value;
+        const selBasin = document.getElementById('basinSelect').value;
+        const selCY = document.getElementById('cyNumber').value.padStart(2, '0');
+        
+        const lines = input.split('\n').filter(l => l.trim() !== "");
+        let result = [];
+
+        lines.forEach(line => {
+            const p = line.split(',').map(s => s.trim());
+            
+            // 데이터 행 식별 (8개 이상의 컬럼이 있을 때만 처리)
+            if (p.length >= 8 && !isNaN(p[0])) {
+                const date = p[0];
+                const time = p[1].padStart(4, '0');
+                const status = p[3].toUpperCase();
+                const lat = formatCoord(p[4]);
+                const lon = formatCoord(p[5]);
+                const vmax = p[6] || '0';
+                const mslp = p[7] || '0';
+                
+                // 풍속 기반 정밀 타입 (64kt 이상은 TY, 130kt 이상은 ST)
+                let type = typeMap[status] || status;
+                const v = parseInt(vmax);
+                if (v >= 130) type = 'ST';
+                else if (v >= 64) type = 'TY';
+
+                const row = [
+                    selBasin,                      // 사용자가 선택한 Basin
+                    selCY.padStart(3, ' '),        // 사용자가 입력한 CY
+                    date + time,
+                    "    ",
+                    "XRQA",
+                    "  0",
+                    lat,
+                    lon.padStart(6, ' '),
+                    vmax.padStart(3, ' '),
+                    mslp.padStart(5, ' '),
+                    type.padStart(3, ' ')
+                ];
+
+                result.push(row.join(', '));
+            }
+        });
+
+        document.getElementById('output').textContent = result.join('\n') || "변환할 데이터 행을 찾지 못했습니다.";
+    }
+</script>
+</body>
+</html>
