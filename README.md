@@ -4,3 +4,7 @@
 이 사이트는 태풍,티니핑,마리오,모동숲 등을 다룰것입니다
 
 이 사이트들의 게임과 위키들은 전부 ai로 제작되었습니다. 저는 html를 코딩할 방법을 모르거든요
+
+사이트들
+
+[atcf to hurdat](Kangchungi37281.github.io/Kangchungi37281.github.io)
