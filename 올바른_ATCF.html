@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATCF 데이터 포맷 변환기</title>
+    <style>
+        /* CSS: 디자인 레이아웃 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #1a73e8;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .description {
+            font-size: 0.9em;
+            color: #666;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .field-info {
+            background: #e8f0fe;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-family: monospace;
+            word-break: break-all;
+            margin-bottom: 20px;
+            border-left: 4px solid #1a73e8;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        textarea:focus {
+            border-color: #1a73e8;
+            outline: none;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 20px 0;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        h3 {
+            margin-top: 30px;
+            font-size: 1.1em;
+            color: #444;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.8em;
+            color: #999;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🌀 ATCF 데이터 포맷 변환기</h2>
+    <p class="description">입력된 데이터를 분석하여 표준 30개 필드 형식으로 강제 재배열합니다. (변환기는 정확하지 않을 수도 있습니다.)</p>
+    
+    <div class="field-info">
+        <strong>대상 순서:</strong> BASIN, CY, YYYYMMDDHH, TECH_NUM, TECH, TAU, LAT, LON, VMAX, MSLP, TY, RAD, WINDCODE, RAD1, RAD2, RAD3, RAD4, RADP, RRP, MRD, GUSTS, EYE, SUBREGION, MAXWIND, HEAT_INDEX, CROSS_SECTION, RELATIVE_INTENSITY, AD_VMAX, AD_MSLP, STC_NAME
+    </div>
+
+    <label for="inputData">원본 데이터 입력 (헤더 포함 가능):</label>
+    <textarea id="inputData" placeholder="데이터를 이곳에 붙여넣으세요..."></textarea>
+    
+    <button onclick="convertATCF()">데이터 강제 변환 실행</button>
+
+    <h3>변환 결과:</h3>
+    <textarea id="outputData" readonly placeholder="변환된 결과가 여기에 표시됩니다."></textarea>
+    
+    <div class="footer">
+        * 필드 구분이 불분명한 텍스트 행은 자동으로 스킵됩니다.
+    </div>
+</div>
+
+<script>
+    /* JavaScript: 데이터 처리 로직 */
+    function convertATCF() {
+        const input = document.getElementById('inputData').value.trim();
+        if (!input) {
+            alert("데이터를 입력해주세요.");
+            return;
+        }
+
+        const lines = input.split('\n');
+        const convertedRows = [];
+
+        lines.forEach(line => {
+            // 쉼표(,) 또는 공백(Tab 포함)으로 데이터 분할
+            // 연속된 공백도 하나로 처리하기 위해 정규식 사용
+            let fields = line.split(/[, \t]+/).map(f => f.trim()).filter(f => f !== "");
+
+            // --- 강제 변환 및 헤더 무시 로직 ---
+            // ATCF 데이터의 특성상 첫 번째 필드(BASIN)는 대개 2글자(AL, WP 등)이며, 
+            // 두 번째 필드(CY)는 숫자입니다. 이 조건에 맞지 않는 헤더 행은 걸러냅니다.
+            if (fields.length < 3) return; 
+            
+            // 데이터가 숫자로 시작하거나 너무 길면(설명 텍스트 등) 무시
+            if (fields[0].length > 4) return; 
+
+            // 30개 필드 배열 생성 (초기값은 공백)
+            const atcfRow = new Array(30).fill("");
+            
+            // 입력된 데이터를 순서대로 30개 칸에 채움
+            fields.forEach((val, index) => {
+                if (index < 30) {
+                    atcfRow[index] = val;
+                }
+            });
+
+            // 쉼표와 공백을 조합하여 표준 출력 형식 생성
+            convertedRows.push(atcfRow.join(", "));
+        });
+
+        const outputArea = document.getElementById('outputData');
+        if (convertedRows.length > 0) {
+            outputArea.value = convertedRows.join('\n');
+        } else {
+            outputArea.value = "유효한 데이터 행을 찾을 수 없습니다. 형식을 확인하세요.";
+        }
+    }
+</script>
+
+</body>
+</html>
