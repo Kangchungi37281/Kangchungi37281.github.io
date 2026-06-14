@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>태풍 진로도 에디터 (ATCF 양방향 입출력 특화 버전)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
+        body { display: flex; flex-direction: column; height: 100vh; background-color: #f5f6fa; }
+        header { background-color: #2c3e50; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .global-inputs { display: flex; gap: 15px; align-items: center; background: #34495e; padding: 10px 20px; color: white; flex-wrap: wrap; }
+        .global-inputs input { padding: 5px; border-radius: 4px; border: none; width: 120px; }
+
+        .control-panel { display: flex; gap: 8px; flex-wrap: wrap; }
+        button, label.file-label { background-color: #3498db; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+        button:hover, label.file-label:hover { background-color: #2980b9; }
+        button.export-atcf { background-color: #2ecc71; }
+        button.export-atcf:hover { background-color: #27ae60; }
+        button.import-atcf-btn { background-color: #e67e22; }
+        button.import-atcf-btn:hover { background-color: #d35400; }
+        button.clear-btn { background-color: #e74c3c; }
+        input[type="file"] { display: none; }
+        
+        #main-container { display: flex; flex: 1; position: relative; overflow: hidden; }
+        #map { flex: 1; height: 100%; }
+
+        /* 우측 데이터 입력 및 목록 사이드바 */
+        #sidebar { width: 360px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; height: 100%; }
+        .sidebar-scroll { padding: 15px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; }
+        .close-edit-btn { background: #7f8c8d; font-size: 0.75rem; padding: 4px 8px; }
+        .close-edit-btn:hover { background: #95a5a6; }
+        
+        .input-group { margin-bottom: 10px; }
+        .input-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; color: #333; }
+        .input-group input, .input-group select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        /* 점 목록 테이블 스타일 */
+        .track-list-container { border-top: 2px solid #bdc3c7; padding-top: 10px; margin-top: 5px; }
+        .track-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: center; }
+        .track-table th { background: #34495e; color: white; padding: 6px; }
+        .track-table td { padding: 6px; border-bottom: 1px solid #ddd; cursor: pointer; }
+        .track-table tr:hover { background: #f1f2f6; }
+        .track-table tr.selected-row { background: #ffe775 !important; font-weight: bold; }
+
+        /* CSS 기반 동적 마커 셰이프 */
+        .typhoon-marker { display: flex; align-items: center; justify-content: center; }
+        .shape-circle { border-radius: 50%; width: 16px; height: 16px; border: 2px solid #000; box-shadow: 0 0 4px rgba(0,0,0,0.4); }
+        .shape-square { width: 16px; height: 16px; border: 2px solid #000; box-shadow: 0 0 4px rgba(0,0,0,0.4); }
+        .shape-triangle {
+            width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent;
+            border-bottom: 16px solid #000; position: relative;
+        }
+        .shape-triangle::after {
+            content: ''; position: absolute; top: 2px; left: -7px; width: 0; height: 0;
+            border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid transparent;
+        }
+
+        /* 선택된 마커 강조 */
+        .selected-node .shape-circle, .selected-node .shape-square { transform: scale(1.4); border-color: #ff3838; box-shadow: 0 0 8px rgba(255,0,0,0.8); }
+        .selected-node .shape-triangle { transform: scale(1.4); border-bottom-color: #ff3838; }
+
+        .info-box { position: absolute; bottom: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); z-index: 1000; max-width: 250px; font-size: 0.75rem; line-height: 1.4; pointer-events: none; }
+        .legend-item { display: flex; align-items: center; margin-top: 3px; font-weight: bold; }
+        .legend-color { width: 14px; height: 14px; margin-right: 6px; border: 1px solid #000; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>🌀 고급 태풍 통합 에디터 (ATCF 가져오기/내보내기 최적화)</h2>
+        <div class="control-panel">
+            <button onclick="exportJSON()">JSON 내보내기</button>
+            <button class="export-atcf" onclick="exportATCF()">ATCF 내보내기</button>
+            
+            <label class="file-label import-atcf-btn" for="import-atcf-file">ATCF 가져오기</label>
+            <input type="file" id="import-atcf-file" accept=".dat,.txt" onchange="importATCF(event)">
+            
+            <label class="file-label" for="import-file">JSON 가져오기</label>
+            <input type="file" id="import-file" accept=".json" onchange="importJSON(event)">
+            <button class="clear-btn" onclick="clearPath()">초기화</button>
+        </div>
+    </header>
+
+    <div class="global-inputs">
+        <div>
+            <label>🆔 태풍 코드 (8자리): </label>
+            <input type="text" id="typhoon-name" value="WP012026">
+        </div>
+        <div>
+            <label>📛 태풍 이름 (영어): </label>
+            <input type="text" id="typhoon-eng-name" value="HINNAMNOR">
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="map"></div>
+        
+        <div id="sidebar">
+            <div class="sidebar-scroll">
+                <div>
+                    <div class="sidebar-header">
+                        <h3 style="font-size: 1rem;">📍 포인트 설정</h3>
+                        <button id="unselect-btn" class="close-edit-btn" style="display:none;" onclick="unselectNode()">선택 해제</button>
+                    </div>
+                    
+                    <div id="editor-form" style="display:none; margin-top: 10px;">
+                        <div class="input-group">
+                            <label>순번 / 좌표</label>
+                            <input type="text" id="node-info" readonly style="background:#eee; font-weight:bold;">
+                        </div>
+                        <div class="input-group">
+                            <label>저기압 성격 (stage)</label>
+                            <select id="node-stage" onchange="saveCurrentNodeData()">
+                                <option value="Tropical cyclone">Tropical cyclone (● 동그라미)</option>
+                                <option value="Extratropical cyclone">Extratropical cyclone (▲ 세모)</option>
+                                <option value="Subtropical cyclone">Subtropical cyclone (■ 네모)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label>ATCF 등급 코드 (TY 필드)</label>
+                            <select id="node-atcf-code" onchange="saveCurrentNodeData()">
+                                <optgroup label="열대저기압 (Tropical)">
+                                    <option value="TD">TD - Tropical Depression</option>
+                                    <option value="TS" selected>TS - Tropical Storm</option>
+                                    <option value="TY">TY - Typhoon</option>
+                                    <option value="ST">ST - Super Typhoon</option>
+                                    <option value="TC">TC - Tropical Cyclone</option>
+                                    <option value="HU">HU - Hurricane</option>
+                                    <option value="XX">XX - Unknown/Other</option>
+                                </optgroup>
+                                <optgroup label="아열대저기압 (Subtropical)">
+                                    <option value="SD">SD - Subtropical Depression</option>
+                                    <option value="SS">SS - Subtropical Storm</option>
+                                </optgroup>
+                                <optgroup label="비열대저기압 (Extra/Non-Tropical)">
+                                    <option value="EX">EX - Extratropical System</option>
+                                    <option value="MD">MD - Tropical Disturbance</option>
+                                    <option value="IN">IN - Inland</option>
+                                    <option value="DS">DS - Disturbance</option>
+                                    <option value="LO">LO - Low Pressure System</option>
+                                    <option value="WV">WV - Tropical Wave</option>
+                                    <option value="ET">ET - Unknown Extratropical</option>
+                                    <option value="DB">DB - Disturbance (Alternative)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label>풍속 숫자 (speed, knots)</label>
+                            <input type="number" id="node-speed" min="0" value="35" oninput="saveCurrentNodeData()">
+                        </div>
+                        <div class="input-group">
+                            <label>중심기압 (pressure, hPa)</label>
+                            <input type="number" id="node-pressure" min="800" max="1050" value="1000" oninput="saveCurrentNodeData()">
+                        </div>
+                        <button class="clear-btn" style="width:100%; margin-top:5px; font-weight:bold; padding: 6px;" onclick="deleteCurrentNode()">이 포인트 삭제</button>
+                    </div>
+                    <div id="editor-placeholder" style="text-align:center; color:#999; margin: 20px 0; font-size: 0.85rem;">
+                        마커 또는 아래 목록의 행을 클릭해 편집하세요.
+                    </div>
+                </div>
+
+                <div class="track-list-container">
+                    <h3 style="font-size: 1rem; margin-bottom: 8px; color: #2c3e50;">📋 전체 경로 점 목록 (<span id="total-points-count">0</span>)</h3>
+                    <div style="max-height: 280px; overflow-y: auto; border: 1px solid #ccc;">
+                        <table class="track-table">
+                            <thead>
+                                <tr>
+                                    <th>번</th>
+                                    <th>위도</th>
+                                    <th>경도</th>
+                                    <th>풍속</th>
+                                    <th>코드</th>
+                                </tr>
+                            </thead>
+                            <tbody id="track-list-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>[입력 풍속별 자동 색상 기준]</strong>
+            <div class="legend-item"><div class="legend-color" style="background:#5EBAFF;"></div>34 kt 미만 (#5EBAFF)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#00FAF4;"></div>34 ~ 64 kt 미만 (#00FAF4)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#FFC;"></div>64 ~ 83 kt 미만 (#FFC)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#FFE775;"></div>83 ~ 96 kt 미만 (#FFE775)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#FFC140;"></div>96 ~ 114 kt 미만 (#FFC140)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#FF8F20;"></div>114 ~ 137 kt 미만 (#FF8F20)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#FF6060;"></div>137 kt 이상 (#FF6060)</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([20.0, 130.0], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+        let currentTrack = []; 
+        let selectedIndex = null;
+
+        const markerGroup = L.layerGroup().addTo(map);
+        const polyline = L.polyline([], {color: '#7f8c8d', weight: 3, dashArray: '6, 6', opacity: 0.8}).addTo(map);
+
+        function getSpeedColor(speed) {
+            const s = parseInt(speed) || 0;
+            if (s < 34) return '#5EBAFF';
+            if (s < 64) return '#00FAF4';
+            if (s < 83) return '#FFC';
+            if (s < 96) return '#FFE775';
+            if (s < 114) return '#FFC140';
+            if (s < 137) return '#FF8F20';
+            return '#FF6060';
+        }
+
+        function convertToLatLngString(lat, lng) {
+            return {
+                latitude: Math.abs(lat).toFixed(1) + (lat >= 0 ? 'N' : 'S'),
+                longitude: Math.abs(lng).toFixed(1) + (lng >= 0 ? 'E' : 'W')
+            };
+        }
+
+        function parseLatLngString(latStr, lngStr) {
+            let lat = parseFloat(latStr); let lng = parseFloat(lngStr);
+            if (latStr.includes('S')) lat = -lat; if (lngStr.includes('W')) lng = -lng;
+            return [lat, lng];
+        }
+
+        map.on('click', function(e) {
+            const strCoords = convertToLatLngString(e.latlng.lat, e.latlng.lng);
+            const nameCode = document.getElementById('typhoon-name').value || "WP012026";
+
+            const newPoint = {
+                name: nameCode,
+                latitude: strCoords.latitude,
+                longitude: strCoords.longitude,
+                speed: 35, 
+                pressure: 1000,
+                atcfCode: "TS", 
+                stage: "Tropical cyclone"
+            };
+
+            currentTrack.push(newPoint);
+            selectedIndex = currentTrack.length - 1;
+            updateMap();
+        });
+
+        function unselectNode() { selectedIndex = null; updateMap(); }
+
+        function updateMap() {
+            markerGroup.clearLayers();
+            const latlngs = [];
+
+            currentTrack.forEach((node, index) => {
+                const coords = parseLatLngString(node.latitude, node.longitude);
+                latlngs.push(coords);
+
+                const color = getSpeedColor(node.speed);
+                let htmlContent = '';
+
+                if (node.stage === 'Tropical cyclone') {
+                    htmlContent = `<div class="shape-circle" style="background-color: ${color};"></div>`;
+                } else if (node.stage === 'Subtropical cyclone') {
+                    htmlContent = `<div class="shape-square" style="background-color: ${color};"></div>`;
+                } else if (node.stage === 'Extratropical cyclone') {
+                    htmlContent = `<div class="shape-triangle" style="border-bottom-color: #000000;"><div style="position:absolute; top:2px; left:-7px; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:12px solid ${color};"></div></div>`;
+                }
+
+                const isSelected = (index === selectedIndex);
+                const className = isSelected ? 'typhoon-marker selected-node' : 'typhoon-marker';
+
+                const customIcon = L.divIcon({
+                    className: className,
+                    html: htmlContent,
+                    iconSize: [25, 25],
+                    iconAnchor: [12, 12]
+                });
+
+                const marker = L.marker(coords, { icon: customIcon }).addTo(markerGroup);
+                
+                marker.bindTooltip(`<b>${node.name} (${index + 1}번)</b><br>코드: ${node.atcfCode}<br>풍속: ${node.speed} kt<br>기압: ${node.pressure} hPa`, { direction: 'top', offset: [0, -10] });
+
+                marker.on('click', function(event) {
+                    L.DomEvent.stopPropagation(event);
+                    selectedIndex = index;
+                    updateMap();
+                });
+            });
+
+            polyline.setLatLngs(latlngs);
+            loadSidebar();
+            renderTrackListTable();
+        }
+
+        function loadSidebar() {
+            const form = document.getElementById('editor-form');
+            const placeholder = document.getElementById('editor-placeholder');
+            const unselectBtn = document.getElementById('unselect-btn');
+
+            if (selectedIndex !== null && currentTrack[selectedIndex]) {
+                form.style.display = 'block'; placeholder.style.display = 'none'; unselectBtn.style.display = 'inline-block';
+                const data = currentTrack[selectedIndex];
+                document.getElementById('node-info').value = `${selectedIndex + 1}번 점 (${data.latitude}, ${data.longitude})`;
+                document.getElementById('node-stage').value = data.stage;
+                document.getElementById('node-atcf-code').value = data.atcfCode || "TS";
+                document.getElementById('node-speed').value = data.speed;
+                document.getElementById('node-pressure').value = data.pressure;
+            } else {
+                form.style.display = 'none'; placeholder.style.display = 'block'; unselectBtn.style.display = 'none';
+            }
+        }
+
+        function renderTrackListTable() {
+            const tbody = document.getElementById('track-list-tbody');
+            document.getElementById('total-points-count').innerText = currentTrack.length;
+            tbody.innerHTML = '';
+
+            currentTrack.forEach((node, index) => {
+                const tr = document.createElement('tr');
+                if (index === selectedIndex) tr.className = 'selected-row';
+
+                tr.innerHTML = `
+                    <td><b>${index + 1}</b></td>
+                    <td>${node.latitude}</td>
+                    <td>${node.longitude}</td>
+                    <td>${node.speed} kt</td>
+                    <td><span style="background:#eee; padding:2px 4px; border-radius:3px; font-weight:bold;">${node.atcfCode || 'TS'}</span></td>
+                `;
+
+                tr.onclick = function() {
+                    selectedIndex = index;
+                    updateMap();
+                };
+                tbody.appendChild(tr);
+            });
+        }
+
+        function saveCurrentNodeData() {
+            if (selectedIndex === null) return;
+            const nameCode = document.getElementById('typhoon-name').value || "WP012026";
+            currentTrack[selectedIndex].name = nameCode;
+            currentTrack[selectedIndex].stage = document.getElementById('node-stage').value;
+            currentTrack[selectedIndex].atcfCode = document.getElementById('node-atcf-code').value;
+            currentTrack[selectedIndex].speed = parseInt(document.getElementById('node-speed').value) || 0;
+            currentTrack[selectedIndex].pressure = parseInt(document.getElementById('node-pressure').value) || 1000;
+            updateMap();
+        }
+
+        function deleteCurrentNode() {
+            if (selectedIndex === null) return;
+            currentTrack.splice(selectedIndex, 1);
+            selectedIndex = null;
+            updateMap();
+        }
+
+        function generateFakeDate(index) {
+            const baseDate = new Date();
+            baseDate.setHours(baseDate.getHours() + (index * 6));
+            const yyyy = baseDate.getFullYear();
+            const mm = String(baseDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(baseDate.getDate()).padStart(2, '0');
+            const hh = String(Math.floor(baseDate.getHours() / 6) * 6).padStart(2, '0');
+            return { yyyymmdd: `${yyyy}${mm}${dd}`, hhmm: `${hh}00` };
+        }
+
+        function exportATCF() {
+            if (currentTrack.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
+            const idCode = document.getElementById('typhoon-name').value || "WP012026";
+            
+            const basin = idCode.substring(0, 2).toUpperCase();
+            const cy = idCode.substring(2, 4);
+            let output = "";
+
+            currentTrack.forEach((node, index) => {
+                const timeObj = generateFakeDate(index);
+                const latNum = parseFloat(node.latitude).toFixed(1).replace('.', '');
+                const latHem = node.latitude.slice(-1);
+                const lngNum = parseFloat(node.longitude).toFixed(1).replace('.', '');
+                const lngHem = node.longitude.slice(-1);
+
+                const tyCode = node.atcfCode || "TS";
+
+                const fields = [
+                    basin,                                   // 1. BASIN
+                    String(cy).padStart(2, '0'),             // 2. CY
+                    `${timeObj.yyyymmdd}${timeObj.hhmm}`,    // 3. YYYYMMDDHH
+                    "03",                                    // 4. TECH_NUM
+                    "BEST",                                  // 5. TECH
+                    "000",                                   // 6. TAU
+                    `${latNum}${latHem}`.padStart(5),        // 7. LAT
+                    `${lngNum}${lngHem}`.padStart(6),        // 8. LON
+                    String(node.speed).padStart(4),          // 9. VMAX
+                    String(node.pressure).padStart(5),       // 10. MSLP
+                    tyCode.padStart(3),                      // 11. TY
+                    "   ",                                   // 12. RAD
+                    "   ",                                   // 13. WINDCODE
+                    "    ",                                  // 14. RAD1
+                    "    ",                                  // 15. RAD2
+                    "    ",                                  // 16. RAD3
+                    "    ",                                  // 17. RAD4
+                    "    ",                                  // 18. RADP
+                    "    ",                                  // 19. RRP
+                    "   ",                                   // 20. MRD
+                    "   ",                                   // 21. GUSTS
+                    "   ",                                   // 22. EYE
+                    "   ",                                   // 23. SUBREGION
+                    "   ",                                   // 24. MAXWIND
+                    "    ",                                  // 25. HEAT_INDEX
+                    "   ",                                   // 26. CROSS_SECTION
+                    "   ",                                   // 27. RELATIVE_INTENSITY
+                    "    ",                                  // 28. AD_VMAX
+                    "    ",                                  // 29. AD_MSLP
+                    document.getElementById('typhoon-eng-name').value.toUpperCase() // 30. STC_NAME
+                ];
+
+                output += fields.join(', ') + '\n';
+            });
+            downloadFile(output, `atcf_${idCode}.dat`, 'text/plain');
+        }
+
+        // [신규 기능] ATCF 파일(.dat / .txt)을 해석하여 편집 시스템 내부로 불러오기
+        function importATCF(event) {
+            const input = event.target;
+            if (!input.files[0]) return;
+
+            const reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    const lines = reader.result.split('\n');
+                    const parsedTrack = [];
+                    let extractedBasin = "WP";
+                    let extractedCy = "01";
+                    let extractedName = "UNNAMED";
+
+                    lines.forEach(line => {
+                        if (!line.trim()) return; // 빈 줄 패스
+                        
+                        // 쉼표 기준 파싱 및 공백 트림 처리
+                        const tokens = line.split(',').map(t => t.trim());
+                        if (tokens.length < 11) return; // 최소 데이터 열 유효성 검사
+
+                        extractedBasin = tokens[0] || "WP";
+                        extractedCy = tokens[1] || "01";
+
+                        // 7열(위도), 8열(경도) 데이터 추출 및 변환 (예: 153N -> 15.3N)
+                        let rawLat = tokens[6];
+                        let rawLng = tokens[7];
+                        
+                        let latHem = rawLat.slice(-1);
+                        let latVal = (parseFloat(rawLat.slice(0, -1)) / 10).toFixed(1);
+                        let finalLat = `${latVal}${latHem}`;
+
+                        let lngHem = rawLng.slice(-1);
+                        let lngVal = (parseFloat(rawLng.slice(0, -1)) / 10).toFixed(1);
+                        let finalLng = `${lngVal}${lngHem}`;
+
+                        // 9열(풍속), 10열(기압), 11열(ATCF 등급 코드)
+                        let speed = parseInt(tokens[8]) || 35;
+                        let pressure = parseInt(tokens[9]) || 1000;
+                        let atcfCode = tokens[10] || "TS";
+
+                        // 30열 태풍 영어이름 파싱 시도
+                        if (tokens[29]) {
+                            extractedName = tokens[29];
+                        }
+
+                        // 저기압 성격 기본 셰이프 매핑 (EX인 경우 Extratropical, SD/SS인 경우 Subtropical 설정)
+                        let stage = "Tropical cyclone";
+                        if (["EX", "ET"].includes(atcfCode)) stage = "Extratropical cyclone";
+                        else if (["SD", "SS"].includes(atcfCode)) stage = "Subtropical cyclone";
+
+                        parsedTrack.push({
+                            name: `${extractedBasin}${extractedCy}2026`, // 임시 조합
+                            latitude: finalLat,
+                            longitude: finalLng,
+                            speed: speed,
+                            pressure: pressure,
+                            atcfCode: atcfCode,
+                            stage: stage
+                        });
+                    });
+
+                    if (parsedTrack.length > 0) {
+                        currentTrack = parsedTrack;
+                        
+                        // 상단 전역 인풋 필드 복원 동기화
+                        document.getElementById('typhoon-name').value = `${extractedBasin}${String(extractedCy).padStart(2,'0')}2026`;
+                        document.getElementById('typhoon-eng-name').value = extractedName;
+                        
+                        // 바인딩된 고유 이름 내부 동기화
+                        currentTrack.forEach(n => n.name = document.getElementById('typhoon-name').value);
+                        
+                        selectedIndex = null;
+                        updateMap();
+
+                        // 불러온 경로 좌표 범위로 카메라 화면 바운드 피팅
+                        const bounds = L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude)));
+                        map.fitBounds(bounds);
+                        
+                        alert(`ATCF 파일 파싱에 성공했습니다!\n총 ${currentTrack.length}개의 정점을 로드했습니다.`);
+                    } else {
+                        alert("유효한 ATCF 데이터 행을 찾을 수 없습니다.");
+                    }
+                } catch(e) {
+                    alert("ATCF 파일 구조를 해석하는 중 오류가 발생했습니다. 필드 구분을 확인해 주세요.");
+                }
+                input.value = ''; // 동일 파일 재업로드 가능하도록 클리어
+            };
+            reader.readAsText(input.files[0]);
+        }
+
+        function exportJSON() {
+            if (currentTrack.length === 0) { alert("저장할 트랙 데이터가 없습니다."); return; }
+            const nameCode = document.getElementById('typhoon-name').value || "WP012026";
+            currentTrack.forEach(node => node.name = nameCode);
+            const outputJSON = { "tracks": [ currentTrack ] };
+            downloadFile(JSON.stringify(outputJSON, null, 2), `track_${nameCode}.json`, 'application/json');
+        }
+
+        function downloadFile(content, fileName, contentType) {
+            const dataUri = 'data:' + contentType + ';charset=utf-8,' + encodeURIComponent(content);
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', fileName);
+            linkElement.click();
+        }
+
+        function importJSON(event) {
+            const input = event.target; if (!input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    const imported = JSON.parse(reader.result);
+                    if (imported.tracks && Array.isArray(imported.tracks) && Array.isArray(imported.tracks[0])) {
+                        currentTrack = imported.tracks[0];
+                        currentTrack.forEach(node => {
+                            if(!node.atcfCode) node.atcfCode = "TS";
+                        });
+                        if (currentTrack.length > 0) {
+                            document.getElementById('typhoon-name').value = currentTrack[0].name || "WP012026";
+                            selectedIndex = null; updateMap();
+                            const bounds = L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude)));
+                            map.fitBounds(bounds);
+                        }
+                        alert("데이터를 복원하고 목록을 동기화했습니다.");
+                    } else { alert("tracks 구조를 지닌 파일이 아닙니다."); }
+                } catch (e) { alert("JSON 파일 해석에 실패했습니다."); }
+                input.value = '';
+            };
+            reader.readAsText(input.files[0]);
+        }
+
+        function clearPath() {
+            if (confirm("경로를 모두 초기화하시겠습니까?")) { currentTrack = []; selectedIndex = null; updateMap(); }
+        }
+    </script>
+</body>
+</html>
