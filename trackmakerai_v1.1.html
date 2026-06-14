@@ -135,7 +135,7 @@
                                 <input type="text" id="node-lng" oninput="saveCurrentNodeData()">
                             </div>
                         </div>
-
+                        
                         <div class="input-group">
                             <label>ATCF 등급 코드 (TY 필드)</label>
                             <select id="node-atcf-code" onchange="saveCurrentNodeData()">
@@ -271,20 +271,36 @@
             return [isNaN(lat) ? 0 : lat, isNaN(lng) ? 0 : lng];
         }
 
+        // [핵심 변경점] 이전 포인트 설정을 기억하도록 수정된 맵 클릭 핸들러
         map.on('click', function(e) {
             if (isDraggingMap) return;
 
             const strCoords = convertToLatLngString(e.latlng.lat, e.latlng.lng);
             const nameCode = document.getElementById('typhoon-name').value || "WP012026";
 
+            // 기본값 설정
+            let nextSpeed = 35;
+            let nextPressure = 1000;
+            let nextAtcfCode = "TS";
+            let nextStage = "Tropical cyclone";
+
+            // 만약 기존에 찍어둔 포인트가 있다면, 가장 마지막 포인트의 설정을 그대로 상속받음
+            if (currentTrack.length > 0) {
+                const lastPoint = currentTrack[currentTrack.length - 1];
+                nextSpeed = lastPoint.speed;
+                nextPressure = lastPoint.pressure;
+                nextAtcfCode = lastPoint.atcfCode;
+                nextStage = lastPoint.stage;
+            }
+
             const newPoint = {
                 name: nameCode,
                 latitude: strCoords.latitude,
                 longitude: strCoords.longitude,
-                speed: 35, 
-                pressure: 1000,
-                atcfCode: "TS", 
-                stage: "Tropical cyclone"
+                speed: nextSpeed, 
+                pressure: nextPressure,
+                atcfCode: nextAtcfCode, 
+                stage: nextStage
             };
 
             currentTrack.push(newPoint);
@@ -368,7 +384,7 @@
                 document.getElementById('node-speed').value = data.speed;
                 document.getElementById('node-pressure').value = data.pressure;
             } else {
-                form.style.display = 'none'; placeholder.style.display = 'block'; unselectBtn.style.none;
+                form.style.display = 'none'; placeholder.style.display = 'block'; unselectBtn.style.display = 'none';
             }
         }
 
@@ -408,7 +424,6 @@
             const selectedCode = document.getElementById('node-atcf-code').value;
             currentTrack[selectedIndex].atcfCode = selectedCode;
             
-            // [자동 연동 고도화] 드롭다운이 제거되었으므로 등급 코드에 맞춰 자동으로 stage 설정
             if (["TY", "TD", "TS", "ST", "TC", "HU", "XX"].includes(selectedCode)) {
                 currentTrack[selectedIndex].stage = "Tropical cyclone";
             } else if (["SD", "SS"].includes(selectedCode)) {
