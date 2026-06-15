@@ -7,6 +7,13 @@
 
 사이트 기능 제거됨
 
+트랙 메이커 링크
+[윈도우](https://kangchungi37281.github.io/trackmakerai_v1.1.html)
+
+[모바일](https://kangchungi37281.github.io/trackmakerai_v1.1_android.html)
+
+## 역사
+
 2026년 5월 20일 업데이트:PC를 오늘부터 로그아웃 합니다 pc를 쓰긴 하는데 오늘부터 bing 번역 오류랑 미해결 문제들로 인해 pc만 로그아웃해야할 것 같습니다
 
 ai가 만든 것들이다 보니까 오류가 많을 수도 있습니다. 저는 html 초보자입니다
