@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>태풍 진로도 에디터 (ATCF 양방향 입출력 완벽 대응)</title>
+    <title>태풍 진로도 에디터 (반경 코드 직접 수정 버전)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
@@ -26,19 +26,32 @@
         #main-container { display: flex; flex: 1; position: relative; overflow: hidden; }
         #map { flex: 1; height: 100%; }
 
-        /* 우측 데이터 입력 및 목록 사이드바 (모바일 반응형 고려) */
-        #sidebar { width: 360px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; height: 100%; z-index: 1001; }
-        .sidebar-scroll { padding: 15px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        #sidebar { width: 380px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; height: 100%; z-index: 1001; }
+        .sidebar-scroll { padding: 15px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; }
         
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; }
         .close-edit-btn { background: #7f8c8d; font-size: 0.75rem; padding: 4px 8px; }
         .close-edit-btn:hover { background: #95a5a6; }
         
-        .input-group { margin-bottom: 10px; }
-        .input-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; color: #333; }
-        .input-group input, .input-group select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95rem; }
+        .toggle-container { display: flex; align-items: center; justify-content: space-between; background: #edf2f7; padding: 8px 12px; border-radius: 6px; margin-top: 5px; }
+        .toggle-label { font-size: 0.85rem; font-weight: bold; color: #2c3e50; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2ecc71; }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        .input-group { margin-bottom: 8px; }
+        .input-group label { display: block; font-size: 0.82rem; font-weight: bold; margin-bottom: 3px; color: #333; }
+        .input-group input, .input-group select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
         
-        /* 점 목록 테이블 스타일 */
+        .section-title { font-size: 0.85rem; font-weight: bold; color: #2980b9; border-bottom: 1px dashed #cfd8dc; margin: 10px 0 5px 0; padding-bottom: 2px; }
+        .quadrant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+        .advanced-feature-block { display: none; transition: all 0.3s ease; }
+        .advanced-feature-block.show { display: block; }
+
         .track-list-container { border-top: 2px solid #bdc3c7; padding-top: 10px; margin-top: 5px; }
         .track-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: center; }
         .track-table th { background: #34495e; color: white; padding: 6px; }
@@ -46,7 +59,6 @@
         .track-table tr:hover { background: #f1f2f6; }
         .track-table tr.selected-row { background: #ffe775 !important; font-weight: bold; }
 
-        /* CSS 기반 동적 마커 셰이프 */
         .typhoon-marker { display: flex; align-items: center; justify-content: center; }
         .shape-circle { border-radius: 50%; width: 16px; height: 16px; border: 2px solid #000; box-shadow: 0 0 4px rgba(0,0,0,0.4); }
         .shape-square { width: 16px; height: 16px; border: 2px solid #000; box-shadow: 0 0 4px rgba(0,0,0,0.4); }
@@ -54,12 +66,7 @@
             width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent;
             border-bottom: 16px solid #000; position: relative;
         }
-        .shape-triangle::after {
-            content: ''; position: absolute; top: 2px; left: -7px; width: 0; height: 0;
-            border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid transparent;
-        }
 
-        /* 선택된 마커 강조 */
         .selected-node .shape-circle, .selected-node .shape-square { transform: scale(1.4); border-color: #ff3838; box-shadow: 0 0 8px rgba(255,0,0,0.8); }
         .selected-node .shape-triangle { transform: scale(1.4); border-bottom-color: #ff3838; }
 
@@ -67,7 +74,6 @@
         .legend-item { display: flex; align-items: center; margin-top: 3px; font-weight: bold; }
         .legend-color { width: 14px; height: 14px; margin-right: 6px; border: 1px solid #000; border-radius: 2px; }
 
-        /* 모바일 / 태블릿 반응형 미디어 쿼리 추가 */
         @media (max-width: 768px) {
             body { height: auto; min-height: 100vh; }
             #main-container { flex-direction: column; overflow: visible; height: auto; }
@@ -82,7 +88,7 @@
 <body>
 
     <header>
-        <h2>🌀 고급 태풍 통합 에디터 (ATCF 표준 규격 준수형)</h2>
+        <h2>🌀 고급 태풍 통합 에디터 (반경 커스텀 패치)</h2>
         <div class="control-panel">
             <button style="background-color: #9b59b6;" onclick="exportHURDAT()">HURDAT 내보내기</button>
             <label class="file-label" style="background-color: #8e44ad;" for="import-hurdat-file">HURDAT 가져오기</label>
@@ -135,6 +141,14 @@
                         <button id="unselect-btn" class="close-edit-btn" style="display:none;" onclick="unselectNode()">선택 해제</button>
                     </div>
                     
+                    <div class="toggle-container">
+                        <span class="toggle-label">⚙️ 고급 제어 기능 사용 (반경/눈/풍속)</span>
+                        <label class="switch">
+                            <input type="checkbox" id="advanced-toggle" checked onchange="toggleAdvancedFeatures()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
                     <div id="editor-form" style="display:none; margin-top: 10px;">
                         <div class="input-group">
                             <label>순번</label>
@@ -180,24 +194,78 @@
                             </select>
                         </div>
 
-                        <div class="input-group">
-                            <label>풍속 숫자 (speed, knots)</label>
-                            <input type="number" id="node-speed" min="0" value="35" oninput="saveCurrentNodeData()">
+                        <div class="input-group" style="display: flex; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label>최대풍속 (VMAX, kt)</label>
+                                <input type="number" id="node-speed" min="0" value="35" oninput="saveCurrentNodeData()">
+                            </div>
+                            <div style="flex: 1;">
+                                <label>중심기압 (MSLP, hPa)</label>
+                                <input type="number" id="node-pressure" min="800" max="1050" value="1000" oninput="saveCurrentNodeData()">
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <label>중심기압 (pressure, hPa)</label>
-                            <input type="number" id="node-pressure" min="800" max="1050" value="1000" oninput="saveCurrentNodeData()">
+
+                        <div class="advanced-feature-block show" id="adv-block-1">
+                            <div class="section-title">📐 고급 구조 분석 (EYE / MRD)</div>
+                            <div class="input-group" style="display: flex; gap: 10px;">
+                                <div style="flex: 1;">
+                                    <label>태풍의 눈 (EYE, nm)</label>
+                                    <input type="number" id="node-eye" min="0" max="999" value="0" oninput="saveCurrentNodeData()">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label>최대풍속반경 (MRD, nm)</label>
+                                    <input type="number" id="node-mrd" min="0" max="999" value="0" oninput="saveCurrentNodeData()">
+                                </div>
+                            </div>
                         </div>
-                        <button class="clear-btn" style="width:100%; margin-top:5px; font-weight:bold; padding: 6px;" onclick="deleteCurrentNode()">이 포인트 삭제</button>
+
+                        <div class="advanced-feature-block show" id="adv-block-2">
+                            <div class="section-title">💨 풍속 반경 설정 (Wind Radii)</div>
+                            <div class="input-group" style="display: flex; gap: 10px; margin-bottom: 5px;">
+                                <div style="flex: 1.2;">
+                                    <label>기준 풍속 프리셋</label>
+                                    <select id="node-windcode" onchange="applyWindcodePreset()">
+                                        <option value="34" selected>34 노트 프리셋</option>
+                                        <option value="50">50 노트 프리셋</option>
+                                        <option value="64">64 노트 프리셋</option>
+                                        <option value="custom">직접 수동 입력...</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 0.8;">
+                                    <label>반경 코드 (RAD)</label>
+                                    <input type="number" id="node-rad" value="34" min="0" max="999" oninput="saveCurrentNodeData()">
+                                </div>
+                            </div>
+                            <div class="quadrant-grid">
+                                <div class="input-group">
+                                    <label>北東 (RAD1, nm)</label>
+                                    <input type="number" id="node-rad1" min="0" max="1200" value="0" oninput="saveCurrentNodeData()">
+                                </div>
+                                <div class="input-group">
+                                    <label>南東 (RAD2, nm)</label>
+                                    <input type="number" id="node-rad2" min="0" max="1200" value="0" oninput="saveCurrentNodeData()">
+                                </div>
+                                <div class="input-group">
+                                    <label>南西 (RAD3, nm)</label>
+                                    <input type="number" id="node-rad3" min="0" max="1200" value="0" oninput="saveCurrentNodeData()">
+                                </div>
+                                <div class="input-group">
+                                    <label>北西 (RAD4, nm)</label>
+                                    <input type="number" id="node-rad4" min="0" max="1200" value="0" oninput="saveCurrentNodeData()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="clear-btn" style="width:100%; margin-top:8px; font-weight:bold; padding: 6px;" onclick="deleteCurrentNode()">이 포인트 삭제</button>
                     </div>
                     <div id="editor-placeholder" style="text-align:center; color:#999; margin: 20px 0; font-size: 0.85rem;">
-                        마커 또는 아래 목록의 행을 클릭해 편집하세요. <br>위도와 경도 수치를 직접 타이핑하여 좌표를 변경할 수도 있습니다.
+                        마커 또는 아래 목록의 행을 클릭해 편집하세요. <br>상단의 토글 스위치로 고급 제어 패널을 열고 닫을 수 있습니다.
                     </div>
                 </div>
 
                 <div class="track-list-container">
                     <h3 style="font-size: 1rem; margin-bottom: 8px; color: #2c3e50;">📋 전체 경로 점 목록 (<span id="total-points-count">0</span>)</h3>
-                    <div style="max-height: 280px; overflow-y: auto; border: 1px solid #ccc;">
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc;">
                         <table class="track-table">
                             <thead>
                                 <tr>
@@ -205,7 +273,7 @@
                                     <th>위도</th>
                                     <th>경도</th>
                                     <th>풍속</th>
-                                    <th>코드</th>
+                                    <th>반경(RAD)</th>
                                 </tr>
                             </thead>
                             <tbody id="track-list-tbody">
@@ -232,7 +300,6 @@
     <script>
         let isDraggingMap = false;
 
-        // 모바일 터치 오작동 방지 속성 주입
         const map = L.map('map', {
             tap: L.Browser.android ? false : true 
         }).setView([20.0, 130.0], 4);
@@ -246,6 +313,29 @@
 
         const markerGroup = L.layerGroup().addTo(map);
         const polyline = L.polyline([], {color: '#7f8c8d', weight: 3, dashArray: '6, 6', opacity: 0.8}).addTo(map);
+
+        function toggleAdvancedFeatures() {
+            const isChecked = document.getElementById('advanced-toggle').checked;
+            const block1 = document.getElementById('adv-block-1');
+            const block2 = document.getElementById('adv-block-2');
+            
+            if (isChecked) {
+                block1.classList.add('show');
+                block2.classList.add('show');
+            } else {
+                block1.classList.remove('show');
+                block2.classList.remove('show');
+            }
+        }
+
+        // 🛠️ 기준 풍속 프리셋 셀렉트 박스 변경 시 처리 핸들러
+        function applyWindcodePreset() {
+            const selectValue = document.getElementById('node-windcode').value;
+            if (selectValue !== 'custom') {
+                document.getElementById('node-rad').value = selectValue;
+            }
+            saveCurrentNodeData();
+        }
 
         function getSpeedColor(speed) {
             const s = parseInt(speed) || 0;
@@ -267,7 +357,6 @@
 
         function parseLatLngString(latStr, lngStr) {
             if (!latStr || !lngStr) return [0, 0];
-            
             let sLat = latStr.toString().trim().toUpperCase();
             let sLng = lngStr.toString().trim().toUpperCase();
 
@@ -282,10 +371,8 @@
 
             let lat = parseFloat(sLat); 
             let lng = parseFloat(sLng);
-            
             if (sLat.includes('S')) lat = -lat; 
             if (sLng.includes('W')) lng = -lng;
-            
             return [isNaN(lat) ? 0 : lat, isNaN(lng) ? 0 : lng];
         }
 
@@ -295,27 +382,25 @@
             const strCoords = convertToLatLngString(e.latlng.lat, e.latlng.lng);
             const nameCode = document.getElementById('typhoon-name').value || "WP012026";
 
-            let nextSpeed = 35;
-            let nextPressure = 1000;
-            let nextAtcfCode = "TS";
-            let nextStage = "Tropical cyclone";
+            let nextSpeed = 35; let nextPressure = 1000; let nextAtcfCode = "TS"; let nextStage = "Tropical cyclone";
+            let nextEye = 0; let nextMrd = 0; let nextWindcode = "34"; let nextRad = 34;
+            let nextRad1 = 0; let nextRad2 = 0; let nextRad3 = 0; let nextRad4 = 0;
 
             if (currentTrack.length > 0) {
                 const lastPoint = currentTrack[currentTrack.length - 1];
-                nextSpeed = lastPoint.speed;
-                nextPressure = lastPoint.pressure;
-                nextAtcfCode = lastPoint.atcfCode;
-                nextStage = lastPoint.stage;
+                nextSpeed = lastPoint.speed; nextPressure = lastPoint.pressure;
+                nextAtcfCode = lastPoint.atcfCode; nextStage = lastPoint.stage;
+                nextEye = lastPoint.eye || 0; nextMrd = lastPoint.mrd || 0;
+                nextWindcode = lastPoint.windcode || "34"; nextRad = lastPoint.rad || 34;
+                nextRad1 = lastPoint.rad1 || 0; nextRad2 = lastPoint.rad2 || 0;
+                nextRad3 = lastPoint.rad3 || 0; nextRad4 = lastPoint.rad4 || 0;
             }
 
             const newPoint = {
-                name: nameCode,
-                latitude: strCoords.latitude,
-                longitude: strCoords.longitude,
-                speed: nextSpeed, 
-                pressure: nextPressure,
-                atcfCode: nextAtcfCode, 
-                stage: nextStage
+                name: nameCode, latitude: strCoords.latitude, longitude: strCoords.longitude,
+                speed: nextSpeed, pressure: nextPressure, atcfCode: nextAtcfCode, stage: nextStage,
+                eye: nextEye, mrd: nextMrd, windcode: nextWindcode, rad: nextRad,
+                rad1: nextRad1, rad2: nextRad2, rad3: nextRad3, rad4: nextRad4
             };
 
             currentTrack.push(newPoint);
@@ -340,7 +425,7 @@
                     htmlContent = `<div class="shape-circle" style="background-color: ${color};"></div>`;
                 } else if (node.stage === 'Subtropical cyclone') {
                     htmlContent = `<div class="shape-square" style="background-color: ${color};"></div>`;
-                } else if (node.stage === 'Extratropical cyclone') {
+                } else {
                     htmlContent = `<div class="shape-triangle" style="border-bottom-color: #000000;"><div style="position:absolute; top:2px; left:-7px; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:12px solid ${color};"></div></div>`;
                 }
 
@@ -348,14 +433,11 @@
                 const className = isSelected ? 'typhoon-marker selected-node' : 'typhoon-marker';
 
                 const customIcon = L.divIcon({
-                    className: className,
-                    html: htmlContent,
-                    iconSize: [25, 25],
-                    iconAnchor: [12, 12]
+                    className: className, html: htmlContent, iconSize: [25, 25], iconAnchor: [12, 12]
                 });
 
                 const marker = L.marker(coords, { icon: customIcon, draggable: true }).addTo(markerGroup);
-                marker.bindTooltip(`<b>${node.name} (${index + 1}번)</b><br>코드: ${node.atcfCode}<br>풍속: ${node.speed} kt<br>기압: ${node.pressure} hPa`, { direction: 'top', offset: [0, -10] });
+                marker.bindTooltip(`<b>${node.name} (${index + 1}번)</b><br>풍속: ${node.speed} kt<br>반경 코드: ${node.rad || 34} nm`, { direction: 'top', offset: [0, -10] });
 
                 marker.on('click', function(event) {
                     L.DomEvent.stopPropagation(event);
@@ -389,17 +471,32 @@
                 const data = currentTrack[selectedIndex];
                 
                 document.getElementById('node-index-info').value = `${selectedIndex + 1}번 포인트`;
-                
-                if (document.activeElement !== document.getElementById('node-lat')) {
-                    document.getElementById('node-lat').value = data.latitude;
-                }
-                if (document.activeElement !== document.getElementById('node-lng')) {
-                    document.getElementById('node-lng').value = data.longitude;
-                }
+                if (document.activeElement !== document.getElementById('node-lat')) document.getElementById('node-lat').value = data.latitude;
+                if (document.activeElement !== document.getElementById('node-lng')) document.getElementById('node-lng').value = data.longitude;
                 
                 document.getElementById('node-atcf-code').value = data.atcfCode || "TS";
                 document.getElementById('node-speed').value = data.speed;
                 document.getElementById('node-pressure').value = data.pressure;
+                
+                document.getElementById('node-eye').value = data.eye !== undefined ? data.eye : 0;
+                document.getElementById('node-mrd').value = data.mrd !== undefined ? data.mrd : 0;
+                
+                // 프리셋 상태 동기화 처리
+                const currentRadValue = data.rad !== undefined ? data.rad : 34;
+                if (['34', '50', '64'].includes(currentRadValue.toString())) {
+                    document.getElementById('node-windcode').value = currentRadValue.toString();
+                } else {
+                    document.getElementById('node-windcode').value = 'custom';
+                }
+                
+                if (document.activeElement !== document.getElementById('node-rad')) {
+                    document.getElementById('node-rad').value = currentRadValue;
+                }
+
+                document.getElementById('node-rad1').value = data.rad1 !== undefined ? data.rad1 : 0;
+                document.getElementById('node-rad2').value = data.rad2 !== undefined ? data.rad2 : 0;
+                document.getElementById('node-rad3').value = data.rad3 !== undefined ? data.rad3 : 0;
+                document.getElementById('node-rad4').value = data.rad4 !== undefined ? data.rad4 : 0;
             } else {
                 form.style.display = 'none'; placeholder.style.display = 'block'; unselectBtn.style.display = 'none';
             }
@@ -413,21 +510,16 @@
             currentTrack.forEach((node, index) => {
                 const tr = document.createElement('tr');
                 if (index === selectedIndex) tr.className = 'selected-row';
-
                 tr.innerHTML = `
                     <td><b>${index + 1}</b></td>
                     <td>${node.latitude}</td>
                     <td>${node.longitude}</td>
                     <td>${node.speed} kt</td>
-                    <td><span style="background:#eee; padding:2px 4px; border-radius:3px; font-weight:bold;">${node.atcfCode || 'TS'}</span></td>
+                    <td>${node.rad || 34} nm</td>
                 `;
-
                 tr.onclick = function() {
-                    selectedIndex = index;
-                    updateMap();
-                    if(window.innerWidth <= 768) {
-                        document.getElementById('sidebar').scrollIntoView({ behavior: 'smooth' });
-                    }
+                    selectedIndex = index; updateMap();
+                    if(window.innerWidth <= 768) document.getElementById('sidebar').scrollIntoView({ behavior: 'smooth' });
                 };
                 tbody.appendChild(tr);
             });
@@ -455,283 +547,236 @@
             currentTrack[selectedIndex].speed = parseInt(document.getElementById('node-speed').value) || 0;
             currentTrack[selectedIndex].pressure = parseInt(document.getElementById('node-pressure').value) || 1000;
             
+            currentTrack[selectedIndex].eye = parseInt(document.getElementById('node-eye').value) || 0;
+            currentTrack[selectedIndex].mrd = parseInt(document.getElementById('node-mrd').value) || 0;
+            
+            // 🛠️ 사용자가 수동 수정한 RAD 인풋값을 그대로 변수에 바인딩합니다.
+            const typedRadValue = parseInt(document.getElementById('node-rad').value) || 0;
+            currentTrack[selectedIndex].rad = typedRadValue;
+            currentTrack[selectedIndex].windcode = typedRadValue.toString();
+            
+            currentTrack[selectedIndex].rad1 = parseInt(document.getElementById('node-rad1').value) || 0;
+            currentTrack[selectedIndex].rad2 = parseInt(document.getElementById('node-rad2').value) || 0;
+            currentTrack[selectedIndex].rad3 = parseInt(document.getElementById('node-rad3').value) || 0;
+            currentTrack[selectedIndex].rad4 = parseInt(document.getElementById('node-rad4').value) || 0;
+            
             const latlngs = currentTrack.map(p => parseLatLngString(p.latitude, p.longitude));
             polyline.setLatLngs(latlngs);
             renderTrackListTable();
-            
-            const markerLayers = markerGroup.getLayers();
-            if(markerLayers[selectedIndex]) {
-                const coords = parseLatLngString(currentTrack[selectedIndex].latitude, currentTrack[selectedIndex].longitude);
-                markerLayers[selectedIndex].setLatLng(coords);
-            }
         }
 
         function deleteCurrentNode() {
             if (selectedIndex === null) return;
-            currentTrack.splice(selectedIndex, 1);
-            selectedIndex = null;
-            updateMap();
+            currentTrack.splice(selectedIndex, 1); selectedIndex = null; updateMap();
         }
 
         function generateUserConfiguredDate(index) {
             const rawDateStr = document.getElementById('typhoon-base-date').value.trim();
             const startHour = parseInt(document.getElementById('typhoon-base-hour').value) || 0;
-
             let year = 2026, month = 8, day = 28;
             if (rawDateStr.length === 8 && !isNaN(rawDateStr)) {
                 year = parseInt(rawDateStr.substring(0, 4));
-                month = parseInt(rawDateStr.substring(4, 6)) - 1; 
-                day = parseInt(rawDateStr.substring(6, 8));
+                month = parseInt(rawDateStr.substring(4, 6)) - 1; day = parseInt(rawDateStr.substring(6, 8));
             }
-
             const targetDate = new Date(year, month, day, startHour, 0, 0, 0);
             targetDate.setHours(targetDate.getHours() + (index * 6));
-            
-            const outYear = targetDate.getFullYear();
-            const outMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const outDay = String(targetDate.getDate()).padStart(2, '0');
-            const outHour = String(targetDate.getHours()).padStart(2, '0');
-            
-            return { yyyymmdd: `${outYear}${outMonth}${outDay}`, hhmm: `${outHour}00` };
+            return {
+                yyyymmdd: `${targetDate.getFullYear()}${String(targetDate.getMonth() + 1).padStart(2, '0')}${String(targetDate.getDate()).padStart(2, '0')}`,
+                hhmm: `${String(targetDate.getHours()).padStart(2, '0')}00`
+            };
+        }
+
+        function downloadFile(content, fileName, contentType) {
+            try {
+                const blob = new Blob([content], { type: contentType + ";charset=utf-8;" });
+                const linkElement = document.createElement('a');
+                if (linkElement.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    linkElement.setAttribute('href', url);
+                    linkElement.setAttribute('download', fileName);
+                    linkElement.style.visibility = 'hidden';
+                    document.body.appendChild(linkElement);
+                    linkElement.click();
+                    document.body.removeChild(linkElement);
+                    URL.revokeObjectURL(url);
+                } else {
+                    const dataUri = 'data:' + contentType + ';charset=utf-8,' + encodeURIComponent(content);
+                    linkElement.setAttribute('href', dataUri);
+                    linkElement.setAttribute('download', fileName);
+                    linkElement.click();
+                }
+            } catch(e) {
+                alert("브라우저 다운로드 샌드박스 예외 발생");
+                console.error(e);
+            }
         }
 
         function exportATCF() {
-            if (currentTrack.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
-            const idCode = document.getElementById('typhoon-name').value || "WP012026";
-            
-            const basin = idCode.substring(0, 2).toUpperCase();
+            if (!currentTrack || currentTrack.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
+            const idCode = (document.getElementById('typhoon-name').value || "WP012026").trim();
+            const basin = idCode.substring(0, 2).toUpperCase(); 
             const cy = idCode.substring(2, 4);
             let output = "";
 
             currentTrack.forEach((node, index) => {
                 const timeObj = generateUserConfiguredDate(index);
-                
                 const parsedCoords = parseLatLngString(node.latitude, node.longitude);
-                const latNum = Math.round(Math.abs(parsedCoords[0]) * 10);
-                const latHem = parsedCoords[0] >= 0 ? 'N' : 'S';
-                const lngNum = Math.round(Math.abs(parsedCoords[1]) * 10);
-                const lngHem = parsedCoords[1] >= 0 ? 'E' : 'W';
-
-                const tyCode = node.atcfCode || "TS";
+                const latNum = Math.round(Math.abs(parsedCoords[0]) * 10) + (parsedCoords[0] >= 0 ? 'N' : 'S');
+                const lngNum = Math.round(Math.abs(parsedCoords[1]) * 10) + (parsedCoords[1] >= 0 ? 'E' : 'W');
 
                 const fields = [
-                    basin.trim(),
-                    String(cy).trim().padStart(2, '0'),
-                    `${timeObj.yyyymmdd}${timeObj.hhmm}`,
-                    "03",
-                    "BEST",
-                    "000",
-                    `${latNum}${latHem}`,
-                    `${lngNum}${lngHem}`,
-                    String(node.speed).trim(),
-                    String(node.pressure).trim(),
-                    tyCode.trim(),
-                    "34",
-                    "AAA",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "WP",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    "0",
-                    document.getElementById('typhoon-eng-name').value.trim().toUpperCase()
+                    basin.trim(), String(cy).padStart(2, '0'), `${timeObj.yyyymmdd}${timeObj.hhmm}`,
+                    "03", "BEST", "000", latNum, lngNum,
+                    String(node.speed || 35), String(node.pressure || 1000), (node.atcfCode || "TS"),
+                    String(node.rad || 34), (node.windcode || "34"),
+                    String(node.rad1 || 0), String(node.rad2 || 0), String(node.rad3 || 0), String(node.rad4 || 0),
+                    "0", "0", String(node.mrd || 0), "0", String(node.eye || 0),
+                    "W", "0", "0", "0", "0", "0", "0",
+                    (document.getElementById('typhoon-eng-name').value || "UNNAMED").trim().toUpperCase()
                 ];
-
                 output += fields.join(', ') + '\n';
             });
             downloadFile(output, `atcf_${idCode}.dat`, 'text/plain');
         }
 
-        function importATCF(event) {
-            const input = event.target;
-            if (!input.files[0]) return;
+        function exportJSON() {
+            if (!currentTrack || currentTrack.length === 0) { alert("저장할 트랙 데이터가 없습니다."); return; }
+            const nameCode = (document.getElementById('typhoon-name').value || "WP012026").trim();
+            
+            currentTrack.forEach(node => {
+                node.name = nameCode;
+                if(node.eye === undefined) node.eye = 0;
+                if(node.mrd === undefined) node.mrd = 0;
+                if(node.rad1 === undefined) { node.rad1 = 0; node.rad2 = 0; node.rad3 = 0; node.rad4 = 0; node.rad = 34; node.windcode = "34"; }
+            });
 
+            const outputJSON = {
+                "typhoonCode": nameCode,
+                "typhoonEngName": (document.getElementById('typhoon-eng-name').value || "UNNAMED").trim(),
+                "baseDate": (document.getElementById('typhoon-base-date').value || "20260828").trim(),
+                "baseHour": document.getElementById('typhoon-base-hour').value,
+                "tracks": currentTrack
+            };
+            downloadFile(JSON.stringify(outputJSON, null, 2), `track_${nameCode}.json`, 'application/json');
+        }
+
+        function exportHURDAT() {
+            if (!currentTrack || currentTrack.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
+            const idCode = (document.getElementById('typhoon-name').value || "WP012026").trim().toUpperCase();
+            const engName = (document.getElementById('typhoon-eng-name').value || "UNNAMED").trim().toUpperCase();
+            let output = `${idCode}, ${engName.padEnd(10)}, ${String(currentTrack.length).padStart(5)},\n`;
+
+            currentTrack.forEach((node, index) => {
+                const timeObj = generateUserConfiguredDate(index);
+                const parsedCoords = parseLatLngString(node.latitude, node.longitude);
+                const latStr = (Math.abs(parsedCoords[0]).toFixed(1) + (parsedCoords[0] >= 0 ? 'N' : 'S')).padStart(5);
+                const lngStr = (Math.abs(parsedCoords[1]).toFixed(1) + (parsedCoords[1] >= 0 ? 'E' : 'W')).padStart(6);
+                const fields = [
+                    timeObj.yyyymmdd, ` ${timeObj.hhmm}`, "  ", (node.atcfCode || "TS").trim().padStart(3),
+                    ` ${latStr}`, ` ${lngStr}`, String(node.speed || 35).padStart(4), String(node.pressure || 1000).padStart(5)
+                ];
+                output += fields.join(',') + ',\n';
+            });
+            downloadFile(output, `hurdat_${idCode}.txt`, 'text/plain');
+        }
+
+        function importATCF(event) {
+            const input = event.target; if (!input.files[0]) return;
             const reader = new FileReader();
             reader.onload = function() {
                 try {
-                    const lines = reader.result.split('\n');
-                    const parsedTrack = [];
-                    let extractedBasin = "WP";
-                    let extractedCy = "01";
-                    let extractedName = "UNNAMED";
-                    let firstDateTime = ""; 
+                    const lines = reader.result.split('\n'); const parsedTrack = [];
+                    let extractedBasin = "WP"; let extractedCy = "01"; let extractedName = "UNNAMED"; let firstDateTime = ""; 
 
                     lines.forEach(line => {
-                        if (!line.trim()) return; 
-                        
-                        const tokens = line.split(',').map(t => t.trim());
+                        if (!line.trim()) return; const tokens = line.split(',').map(t => t.trim());
                         if (tokens.length < 11) return; 
 
-                        extractedBasin = tokens[0] || "WP";
-                        extractedCy = tokens[1] || "01";
+                        extractedBasin = tokens[0] || "WP"; extractedCy = tokens[1] || "01";
+                        if (!firstDateTime && tokens[2] && tokens[2].length >= 10) firstDateTime = tokens[2]; 
 
-                        if (!firstDateTime && tokens[2] && tokens[2].length >= 10) {
-                            firstDateTime = tokens[2]; 
-                        }
-
-                        let rawLat = tokens[6];
-                        let rawLng = tokens[7];
-                        let speed = parseInt(tokens[8]) || 35;
-                        let pressure = parseInt(tokens[9]) || 1000;
                         let atcfCode = tokens[10] || "TS";
-
                         if (tokens[29]) extractedName = tokens[29];
 
                         let stage = "Tropical cyclone";
-                        if (["TY", "TD", "TS", "ST", "TC", "HU", "XX"].includes(atcfCode)) {
-                            stage = "Tropical cyclone";
-                        } else if (["SD", "SS"].includes(atcfCode)) {
-                            stage = "Subtropical cyclone";
-                        } else if (["EX", "MD", "IN", "DS", "LO", "WV", "ET", "DB"].includes(atcfCode)) {
-                            stage = "Extratropical cyclone";
-                        }
+                        if (["TY", "TD", "TS", "ST", "TC", "HU", "XX"].includes(atcfCode)) stage = "Tropical cyclone";
+                        else if (["SD", "SS"].includes(atcfCode)) stage = "Subtropical cyclone";
+                        else stage = "Extratropical cyclone";
 
                         parsedTrack.push({
-                            name: `${extractedBasin}${extractedCy}2026`, 
-                            latitude: rawLat,
-                            longitude: rawLng,
-                            speed: speed,
-                            pressure: pressure,
-                            atcfCode: atcfCode,
-                            stage: stage
+                            name: `${extractedBasin}${extractedCy}2026`, latitude: tokens[6], longitude: tokens[7],
+                            speed: parseInt(tokens[8]) || 35, pressure: parseInt(tokens[9]) || 1000,
+                            atcfCode: atcfCode, stage: stage,
+                            rad: parseInt(tokens[11]) || 34, windcode: tokens[12] || "34",
+                            rad1: parseInt(tokens[13]) || 0, rad2: parseInt(tokens[14]) || 0,
+                            rad3: parseInt(tokens[15]) || 0, rad4: parseInt(tokens[16]) || 0,
+                            mrd: parseInt(tokens[19]) || 0, eye: parseInt(tokens[21]) || 0
                         });
                     });
 
                     if (parsedTrack.length > 0) {
                         currentTrack = parsedTrack;
-                        
                         document.getElementById('typhoon-name').value = `${extractedBasin}${String(extractedCy).padStart(2,'0')}2026`;
                         document.getElementById('typhoon-eng-name').value = extractedName;
-                        
                         if (firstDateTime) {
-                            const datePart = firstDateTime.substring(0, 8);
-                            const hourPart = firstDateTime.substring(8, 10);
-                            document.getElementById('typhoon-base-date').value = datePart;
-                            if (["00", "06", "12", "18"].includes(hourPart)) {
-                                document.getElementById('typhoon-base-hour').value = hourPart;
+                            document.getElementById('typhoon-base-date').value = firstDateTime.substring(0, 8);
+                            if (["00", "06", "12", "18"].includes(firstDateTime.substring(8, 10))) {
+                                document.getElementById('typhoon-base-hour').value = firstDateTime.substring(8, 10);
                             }
                         }
-                        
                         currentTrack.forEach(n => n.name = document.getElementById('typhoon-name').value);
+                        selectedIndex = null; updateMap();
+                        map.fitBounds(L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude))));
                         
-                        selectedIndex = null;
-                        updateMap();
-
-                        const bounds = L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude)));
-                        map.fitBounds(bounds);
-                        
-                        alert(`데이터 복원 완료!\n날짜 정보(${firstDateTime || '기본값'})를 동기화했습니다.`);
-                    } else {
-                        alert("파일 내부에서 식별 가능한 유효 데이터 필드를 찾지 못했습니다.");
+                        document.getElementById('advanced-toggle').checked = true;
+                        toggleAdvancedFeatures();
+                        alert(`고급 ATCF 구조 규격 로딩 완료!`);
                     }
-                } catch(e) {
-                    alert("ATCF 포맷을 변환하는 도중 에러가 일어났습니다. 명세 형식을 다시 확인하십시오.");
-                }
+                } catch(e) { alert("ATCF 파싱 실패."); }
                 input.value = ''; 
             };
             reader.readAsText(input.files[0]);
         }
 
-        // [형식 변경 및 보완] 메타데이터 요소를 포함하는 객체 구조로 내보내기 정의
-        function exportJSON() {
-            if (currentTrack.length === 0) { alert("저장할 트랙 데이터가 없습니다."); return; }
-            const nameCode = document.getElementById('typhoon-name').value || "WP012026";
-            const engName = document.getElementById('typhoon-eng-name').value || "UNNAMED";
-            const baseDate = document.getElementById('typhoon-base-date').value || "20260828";
-            const baseHour = document.getElementById('typhoon-base-hour').value || "00";
-            
-            currentTrack.forEach(node => node.name = nameCode);
-            
-            // 메타데이터 요소를 상단 루트 필드에 배치하고 고도화된 JSON 구조 빌드
-            const outputJSON = {
-                "typhoonCode": nameCode,
-                "typhoonEngName": engName,
-                "baseDate": baseDate,
-                "baseHour": baseHour,
-                "tracks": currentTrack
-            };
-            
-            downloadFile(JSON.stringify(outputJSON, null, 2), `track_${nameCode}.json`, 'application/json');
-        }
-
-        function downloadFile(content, fileName, contentType) {
-            const dataUri = 'data:' + contentType + ';charset=utf-8,' + encodeURIComponent(content);
-            const linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', fileName);
-            linkElement.click();
-        }
-
-        // [가져오기 동기화 보완] 신규 메타데이터 패키징 포맷 및 이전 모든 하위 호환 완벽 파싱 대응
         function importJSON(event) {
             const input = event.target; if (!input.files[0]) return;
             const reader = new FileReader();
             reader.onload = function() {
                 try {
-                    const imported = JSON.parse(reader.result);
-                    let targetTrack = null;
-
-                    // 1. 신규 포맷 검증 (typhoonCode 혹은 tracks 필드가 선언된 객체 구조)
-                    if (imported && !Array.isArray(imported) && imported.tracks) {
-                        // 메타데이터 복원 처리 시작
-                        if (imported.typhoonCode) document.getElementById('typhoon-name').value = imported.typhoonCode;
-                        if (imported.typhoonEngName) document.getElementById('typhoon-eng-name').value = imported.typhoonEngName;
-                        if (imported.baseDate) document.getElementById('typhoon-base-date').value = imported.baseDate;
-                        if (imported.baseHour && ["00", "06", "12", "18"].includes(imported.baseHour)) {
-                            document.getElementById('typhoon-base-hour').value = imported.baseHour;
+                    const imported = JSON.parse(reader.result); let targetTrack = null;
+                    if (imported && typeof imported === 'object') {
+                        if (imported.tracks && Array.isArray(imported.tracks) && Array.isArray(imported.tracks[0])) {
+                            targetTrack = imported.tracks[0];
+                        } else if (imported.tracks && Array.isArray(imported.tracks) && !Array.isArray(imported.tracks[0])) {
+                            targetTrack = imported.tracks;
+                            if (imported.typhoonCode) document.getElementById('typhoon-name').value = imported.typhoonCode;
+                            if (imported.typhoonEngName) document.getElementById('typhoon-eng-name').value = imported.typhoonEngName;
+                            if (imported.baseDate) document.getElementById('typhoon-base-date').value = imported.baseDate;
+                            if (imported.baseHour) document.getElementById('typhoon-base-hour').value = imported.baseHour;
+                        } else if (Array.isArray(imported)) {
+                            targetTrack = imported;
                         }
-
-                        // 내부 트랙 추출 배열 호환성 제어
-                        if (Array.isArray(imported.tracks)) {
-                            // { "tracks": [ {node1}, {node2} ] } 신형 검증
-                            if (imported.tracks[0] && !Array.isArray(imported.tracks[0])) {
-                                targetTrack = imported.tracks;
-                            } 
-                            // { "tracks": [ [ {node1}, {node2} ] ] } 구형 중첩배열 예외 복원
-                            else if (Array.isArray(imported.tracks[0])) {
-                                targetTrack = imported.tracks[0];
-                            }
-                        }
-                    } 
-                    // 2. 메타데이터가 없는 순수 객체 배열 포맷([])일 경우 하위 호환 복원
-                    else if (Array.isArray(imported)) {
-                        targetTrack = imported;
                     }
 
                     if (targetTrack && targetTrack.length > 0) {
                         currentTrack = targetTrack;
                         currentTrack.forEach(node => {
                             if(!node.atcfCode) node.atcfCode = "TS";
+                            if(node.eye === undefined) node.eye = 0;
+                            if(node.mrd === undefined) node.mrd = 0;
+                            if(node.rad1 === undefined) { node.rad1 = 0; node.rad2 = 0; node.rad3 = 0; node.rad4 = 0; node.rad = 34; node.windcode = "34"; }
+                            if(!node.stage) {
+                                if (["TY", "TD", "TS", "ST", "TC", "HU", "XX"].includes(node.atcfCode)) node.stage = "Tropical cyclone";
+                                else if (["SD", "SS"].includes(node.atcfCode)) node.stage = "Subtropical cyclone";
+                                else node.stage = "Extratropical cyclone";
+                            }
                         });
-                        
-                        // 파일 내 명시적 코드가 없으면 상단 글 입력칸을 기준값으로 역유도 동기화
-                        if (!imported.typhoonCode) {
-                            document.getElementById('typhoon-name').value = currentTrack[0].name || "WP012026";
-                        }
-                        
-                        selectedIndex = null; 
-                        updateMap();
-                        
-                        const bounds = L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude)));
-                        map.fitBounds(bounds);
-                        
-                        alert("JSON 데이터 및 메타데이터 환경 설정 복원 성공!");
-                    } else { 
-                        alert("유효한 트랙 점 데이터 구조를 찾을 수 없습니다."); 
+                        if (!imported.typhoonCode && currentTrack[0].name) document.getElementById('typhoon-name').value = currentTrack[0].name;
+                        selectedIndex = null; updateMap();
+                        map.fitBounds(L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude))));
+                        alert("JSON 트랙 로드 완료!");
                     }
-                } catch (e) { 
-                    alert("JSON 파싱 에러: 파일 구조를 확인하십시오."); 
-                }
+                } catch (e) { alert("JSON 분석 실패"); }
                 input.value = '';
             };
             reader.readAsText(input.files[0]);
@@ -741,144 +786,52 @@
             if (confirm("경로를 모두 초기화하시겠습니까?")) { currentTrack = []; selectedIndex = null; updateMap(); }
         }
 
-        function exportHURDAT() {
-            if (currentTrack.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
-            const idCode = (document.getElementById('typhoon-name').value || "WP012026").trim().toUpperCase();
-            const engName = (document.getElementById('typhoon-eng-name').value || "UNNAMED").trim().toUpperCase();
-            
-            const headerLine = `${idCode}, ${engName.padEnd(10)}, ${String(currentTrack.length).padStart(5)},`;
-            let output = headerLine + "\n";
-
-            currentTrack.forEach((node, index) => {
-                const timeObj = generateUserConfiguredDate(index);
-                const parsedCoords = parseLatLngString(node.latitude, node.longitude);
-                
-                const latStr = (Math.abs(parsedCoords[0]).toFixed(1) + (parsedCoords[0] >= 0 ? 'N' : 'S')).padStart(5);
-                const lngStr = (Math.abs(parsedCoords[1]).toFixed(1) + (parsedCoords[1] >= 0 ? 'E' : 'W')).padStart(6);
-
-                const speedStr = String(node.speed).padStart(4);
-                const pressureStr = String(node.pressure).padStart(5);
-                const tyCode = (node.atcfCode || "TS").trim().padStart(3);
-
-                const fields = [
-                    timeObj.yyyymmdd, 
-                    ` ${timeObj.hhmm}`, 
-                    "  ",             
-                    tyCode,           
-                    ` ${latStr}`,     
-                    ` ${lngStr}`,     
-                    speedStr,         
-                    pressureStr       
-                ];
-
-                output += fields.join(',') + ',\n';
-            });
-
-            downloadFile(output, `hurdat_${idCode}.txt`, 'text/plain');
-        }
-
         function importHURDAT(event) {
-            const input = event.target;
-            if (!input.files[0]) return;
-
+            const input = event.target; if (!input.files[0]) return;
             const reader = new FileReader();
             reader.onload = function() {
                 try {
-                    const lines = reader.result.split('\n');
-                    const parsedTrack = [];
-                    let extractedId = "WP012026";
-                    let extractedName = "UNNAMED";
-                    let firstDateTime = "";
-
+                    const lines = reader.result.split('\n'); const parsedTrack = [];
+                    let extractedId = "WP012026"; let extractedName = "UNNAMED"; let firstDateTime = "";
                     let i = 0;
                     while (i < lines.length) {
-                        const line = lines[i].trim();
-                        if (!line) { i++; continue; }
-
+                        const line = lines[i].trim(); if (!line) { i++; continue; }
                         const tokens = line.split(',').map(t => t.trim());
-                        
                         if (tokens.length >= 3 && tokens[0].length === 8 && isNaN(tokens[1])) {
-                            extractedId = tokens[0];
-                            extractedName = tokens[1];
-                            
+                            extractedId = tokens[0]; extractedName = tokens[1];
                             i++;
                             while (i < lines.length) {
-                                const dataLine = lines[i].trim();
-                                if (!dataLine) { i++; continue; }
-                                
+                                const dataLine = lines[i].trim(); if (!dataLine) { i++; continue; }
                                 const dataTokens = dataLine.split(',').map(t => t.trim());
-                                
-                                if (dataTokens.length >= 3 && dataTokens[0].length === 8 && isNaN(dataTokens[1])) {
-                                    i--; 
-                                    break;
-                                }
-
+                                if (dataTokens.length >= 3 && dataTokens[0].length === 8 && isNaN(dataTokens[1])) { i--; break; }
                                 if (dataTokens.length < 8) { i++; continue; }
 
-                                if (!firstDateTime && dataTokens[0] && dataTokens[1]) {
-                                    firstDateTime = dataTokens[0] + dataTokens[1].substring(0, 2);
-                                }
+                                if (!firstDateTime && dataTokens[0] && dataTokens[1]) firstDateTime = dataTokens[0] + dataTokens[1].substring(0, 2);
 
-                                let rawLat = dataTokens[4];
-                                let rawLng = dataTokens[5];
-                                let speed = parseInt(dataTokens[6]) || 35;
-                                let pressure = parseInt(dataTokens[7]) || 1000;
                                 let atcfCode = dataTokens[3] || "TS";
-
-                                let stage = "Tropical cyclone";
-                                if (["TY", "TD", "TS", "ST", "TC", "HU", "XX"].includes(atcfCode)) {
-                                    stage = "Tropical cyclone";
-                                } else if (["SD", "SS"].includes(atcfCode)) {
-                                    stage = "Subtropical cyclone";
-                                } else {
-                                    stage = "Extratropical cyclone";
-                                }
-
                                 parsedTrack.push({
-                                    name: extractedId,
-                                    latitude: rawLat,
-                                    longitude: rawLng,
-                                    speed: speed,
-                                    pressure: pressure,
-                                    atcfCode: atcfCode,
-                                    stage: stage
+                                    name: extractedId, latitude: dataTokens[4], longitude: dataTokens[5],
+                                    speed: parseInt(dataTokens[6]) || 35, pressure: parseInt(dataTokens[7]) || 1000,
+                                    atcfCode: atcfCode, eye: 0, mrd: 0, rad1: 0, rad2: 0, rad3: 0, rad4: 0,
+                                    stage: ["TY", "TD", "TS", "ST", "TC", "HU", "XX"].includes(atcfCode) ? "Tropical cyclone" : "Extratropical cyclone"
                                 });
                                 i++;
                             }
                         }
                         i++;
                     }
-
                     if (parsedTrack.length > 0) {
-                        currentTrack = parsedTrack;
-                        
-                        document.getElementById('typhoon-name').value = extractedId;
+                        currentTrack = parsedTrack; document.getElementById('typhoon-name').value = extractedId;
                         document.getElementById('typhoon-eng-name').value = extractedName;
-                        
                         if (firstDateTime && firstDateTime.length >= 10) {
-                            const datePart = firstDateTime.substring(0, 8);
-                            const hourPart = firstDateTime.substring(8, 10);
-                            document.getElementById('typhoon-base-date').value = datePart;
-                            if (["00", "06", "12", "18"].includes(hourPart)) {
-                                document.getElementById('typhoon-base-hour').value = hourPart;
-                            }
+                            document.getElementById('typhoon-base-date').value = firstDateTime.substring(0, 8);
+                            document.getElementById('typhoon-base-hour').value = firstDateTime.substring(8, 10);
                         }
-                        
-                        currentTrack.forEach(n => n.name = document.getElementById('typhoon-name').value);
-                        
-                        selectedIndex = null;
-                        updateMap();
-
-                        const bounds = L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude)));
-                        map.fitBounds(bounds);
-                        
-                        alert(`HURDAT 데이터 파싱 및 로드 완료!\n태풍명: ${extractedName} / 코드: ${extractedId}`);
-                    } else {
-                        alert("HURDAT 파일 내부 구조가 올바르지 않거나 데이터 행을 추출할 수 없습니다.");
+                        selectedIndex = null; updateMap();
+                        map.fitBounds(L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude))));
+                        alert(`HURDAT 로드 완료!`);
                     }
-                } catch(e) {
-                    alert("HURDAT 파일을 읽는 과정에서 파싱 에러가 발생했습니다.");
-                }
+                } catch(e) { alert("HURDAT 파싱 에러"); }
                 input.value = '';
             };
             reader.readAsText(input.files[0]);
