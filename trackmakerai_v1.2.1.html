@@ -191,7 +191,7 @@
                         <button class="clear-btn" style="width:100%; margin-top:5px; font-weight:bold; padding: 6px;" onclick="deleteCurrentNode()">이 포인트 삭제</button>
                     </div>
                     <div id="editor-placeholder" style="text-align:center; color:#999; margin: 20px 0; font-size: 0.85rem;">
-                        마커 또는 아래 목록의 행을 클릭해 편집하세요. <br>위도와 경도 수치를 직접 타이핑하여 좌표를 변경할 수도 있습니다. json는 hypotrack에 삽입하면 일부만 작동합니다.
+                        마커 또는 아래 목록의 행을 클릭해 편집하세요. <br>위도와 경도 수치를 직접 타이핑하여 좌표를 변경할 수도 있습니다.
                     </div>
                 </div>
 
@@ -363,7 +363,6 @@
                     updateMap();
                 });
 
-                // 모바일 터치 드래그다운 맵 튐 방지 제어 연동
                 marker.on('dragstart', () => { map.dragging.disable(); });
                 marker.on('dragend', function(event) {
                     map.dragging.enable();
@@ -426,7 +425,6 @@
                 tr.onclick = function() {
                     selectedIndex = index;
                     updateMap();
-                    // 모바일 사용 시 테이블 클릭했을 때 에디터창 위치로 자동 스크롤 연동
                     if(window.innerWidth <= 768) {
                         document.getElementById('sidebar').scrollIntoView({ behavior: 'smooth' });
                     }
@@ -517,36 +515,36 @@
                 const tyCode = node.atcfCode || "TS";
 
                 const fields = [
-                    basin.trim(),                            // 1. BASIN
-                    String(cy).trim().padStart(2, '0'),      // 2. CY
-                    `${timeObj.yyyymmdd}${timeObj.hhmm}`,    // 3. YYYYMMDDHH
-                    "03",                                    // 4. TECH_NUM
-                    "BEST",                                  // 5. TECH
-                    "000",                                   // 6. TAU
-                    `${latNum}${latHem}`,                    // 7. LAT
-                    `${lngNum}${lngHem}`,                    // 8. LON
-                    String(node.speed).trim(),               // 9. VMAX
-                    String(node.pressure).trim(),            // 10. MSLP
-                    tyCode.trim(),                           // 11. TY
-                    "34",                                    // 12. RAD
-                    "AAA",                                   // 13. WINDCODE
-                    "0",                                     // 14. RAD1
-                    "0",                                     // 15. RAD2
-                    "0",                                     // 16. RAD3
-                    "0",                                     // 17. RAD4
-                    "0",                                     // 18. RADP
-                    "0",                                     // 19. RRP
-                    "0",                                     // 20. MRD
-                    "0",                                     // 21. GUSTS
-                    "0",                                     // 22. EYE
-                    "WP",                                    // 23. SUBREGION
-                    "0",                                     // 24. MAXWIND
-                    "0",                                     // 25. HEAT_INDEX
-                    "0",                                     // 26. CROSS_SECTION
-                    "0",                                     // 27. RELATIVE_INTENSITY
-                    "0",                                     // 28. AD_VMAX
-                    "0",                                     // 29. AD_MSLP
-                    document.getElementById('typhoon-eng-name').value.trim().toUpperCase() // 30. STC_NAME
+                    basin.trim(),
+                    String(cy).trim().padStart(2, '0'),
+                    `${timeObj.yyyymmdd}${timeObj.hhmm}`,
+                    "03",
+                    "BEST",
+                    "000",
+                    `${latNum}${latHem}`,
+                    `${lngNum}${lngHem}`,
+                    String(node.speed).trim(),
+                    String(node.pressure).trim(),
+                    tyCode.trim(),
+                    "34",
+                    "AAA",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "WP",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    document.getElementById('typhoon-eng-name').value.trim().toUpperCase()
                 ];
 
                 output += fields.join(', ') + '\n';
@@ -644,11 +642,25 @@
             reader.readAsText(input.files[0]);
         }
 
+        // [형식 변경 및 보완] 메타데이터 요소를 포함하는 객체 구조로 내보내기 정의
         function exportJSON() {
             if (currentTrack.length === 0) { alert("저장할 트랙 데이터가 없습니다."); return; }
             const nameCode = document.getElementById('typhoon-name').value || "WP012026";
+            const engName = document.getElementById('typhoon-eng-name').value || "UNNAMED";
+            const baseDate = document.getElementById('typhoon-base-date').value || "20260828";
+            const baseHour = document.getElementById('typhoon-base-hour').value || "00";
+            
             currentTrack.forEach(node => node.name = nameCode);
-            const outputJSON = { "tracks": [ currentTrack ] };
+            
+            // 메타데이터 요소를 상단 루트 필드에 배치하고 고도화된 JSON 구조 빌드
+            const outputJSON = {
+                "typhoonCode": nameCode,
+                "typhoonEngName": engName,
+                "baseDate": baseDate,
+                "baseHour": baseHour,
+                "tracks": currentTrack
+            };
+            
             downloadFile(JSON.stringify(outputJSON, null, 2), `track_${nameCode}.json`, 'application/json');
         }
 
@@ -660,26 +672,66 @@
             linkElement.click();
         }
 
+        // [가져오기 동기화 보완] 신규 메타데이터 패키징 포맷 및 이전 모든 하위 호환 완벽 파싱 대응
         function importJSON(event) {
             const input = event.target; if (!input.files[0]) return;
             const reader = new FileReader();
             reader.onload = function() {
                 try {
                     const imported = JSON.parse(reader.result);
-                    if (imported.tracks && Array.isArray(imported.tracks) && Array.isArray(imported.tracks[0])) {
-                        currentTrack = imported.tracks[0];
+                    let targetTrack = null;
+
+                    // 1. 신규 포맷 검증 (typhoonCode 혹은 tracks 필드가 선언된 객체 구조)
+                    if (imported && !Array.isArray(imported) && imported.tracks) {
+                        // 메타데이터 복원 처리 시작
+                        if (imported.typhoonCode) document.getElementById('typhoon-name').value = imported.typhoonCode;
+                        if (imported.typhoonEngName) document.getElementById('typhoon-eng-name').value = imported.typhoonEngName;
+                        if (imported.baseDate) document.getElementById('typhoon-base-date').value = imported.baseDate;
+                        if (imported.baseHour && ["00", "06", "12", "18"].includes(imported.baseHour)) {
+                            document.getElementById('typhoon-base-hour').value = imported.baseHour;
+                        }
+
+                        // 내부 트랙 추출 배열 호환성 제어
+                        if (Array.isArray(imported.tracks)) {
+                            // { "tracks": [ {node1}, {node2} ] } 신형 검증
+                            if (imported.tracks[0] && !Array.isArray(imported.tracks[0])) {
+                                targetTrack = imported.tracks;
+                            } 
+                            // { "tracks": [ [ {node1}, {node2} ] ] } 구형 중첩배열 예외 복원
+                            else if (Array.isArray(imported.tracks[0])) {
+                                targetTrack = imported.tracks[0];
+                            }
+                        }
+                    } 
+                    // 2. 메타데이터가 없는 순수 객체 배열 포맷([])일 경우 하위 호환 복원
+                    else if (Array.isArray(imported)) {
+                        targetTrack = imported;
+                    }
+
+                    if (targetTrack && targetTrack.length > 0) {
+                        currentTrack = targetTrack;
                         currentTrack.forEach(node => {
                             if(!node.atcfCode) node.atcfCode = "TS";
                         });
-                        if (currentTrack.length > 0) {
+                        
+                        // 파일 내 명시적 코드가 없으면 상단 글 입력칸을 기준값으로 역유도 동기화
+                        if (!imported.typhoonCode) {
                             document.getElementById('typhoon-name').value = currentTrack[0].name || "WP012026";
-                            selectedIndex = null; updateMap();
-                            const bounds = L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude)));
-                            map.fitBounds(bounds);
                         }
-                        alert("JSON 데이터 복원 성공!");
-                    } else { alert("구조가 불일치합니다."); }
-                } catch (e) { alert("JSON 파싱 에러"); }
+                        
+                        selectedIndex = null; 
+                        updateMap();
+                        
+                        const bounds = L.latLngBounds(currentTrack.map(p => parseLatLngString(p.latitude, p.longitude)));
+                        map.fitBounds(bounds);
+                        
+                        alert("JSON 데이터 및 메타데이터 환경 설정 복원 성공!");
+                    } else { 
+                        alert("유효한 트랙 점 데이터 구조를 찾을 수 없습니다."); 
+                    }
+                } catch (e) { 
+                    alert("JSON 파싱 에러: 파일 구조를 확인하십시오."); 
+                }
                 input.value = '';
             };
             reader.readAsText(input.files[0]);
@@ -689,7 +741,6 @@
             if (confirm("경로를 모두 초기화하시겠습니까?")) { currentTrack = []; selectedIndex = null; updateMap(); }
         }
 
-        /* [HURDAT 내보내기] 수정 사안 및 모바일 완벽 바인딩 */
         function exportHURDAT() {
             if (currentTrack.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
             const idCode = (document.getElementById('typhoon-name').value || "WP012026").trim().toUpperCase();
