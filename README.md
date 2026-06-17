@@ -7,10 +7,9 @@
 
 사이트 기능 제거됨
 
-트랙 메이커 링크
-[윈도우](https://kangchungi37281.github.io/trackmakerai_v1.1.html)
+## 트랙 메이커 링크
 
-[모바일](https://kangchungi37281.github.io/trackmakerai_v1.1_android.html)
+[윈도우 및 모바일](https://kangchungi37281.github.io/trackmakerai_v1.2.5.html)
 
 ## 주의사항
 
