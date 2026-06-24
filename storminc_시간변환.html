@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>strom inc 시간 변경</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 24px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        p {
+            color: #7f8c8d;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .textarea-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        label {
+            font-weight: bold;
+            color: #34495e;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            resize: vertical;
+            box-sizing: border-box;
+            background-color: #fafafa;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            background-color: #fff;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            margin: 20px 0;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:active {
+            background-color: #1f6391;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>strom inc 시간 변경</h1>
+    <p>이 도구는 변환 버튼을 누르면 3시간 간격이 6시간 간격으로 바꿔줍니다. 이 도구는 0시, 6시, 12시, 18시만 남겨두고 나머지 시간(3시, 9시, 15시, 21시)을 제거합니다.</p>
+    
+    <div class="textarea-group">
+        <div>
+            <label for="inputData">원본 ATCF 데이터 입력:</label>
+            <textarea id="inputData" placeholder="이곳에 ATCF 데이터를 붙여넣으세요...&#10;예: WP, 01, 2026060103, 00, BEST, ..."></textarea>
+        </div>
+        
+        <button onclick="convertData()">변환하기</button>
+        
+        <div>
+            <label for="outputData">변환된 데이터 (6시간 간격):</label>
+            <textarea id="outputData" readonly placeholder="변환된 결과가 여기에 표시됩니다..."></textarea>
+        </div>
+    </div>
+</div>
+
+<script>
+    function convertData() {
+        const inputText = document.getElementById('inputData').value;
+        const lines = inputText.split('\n');
+        const resultLines = [];
+
+        // 허용할 시간 (00, 06, 12, 18)
+        const allowedHours = ['00', '06', '12', '18'];
+
+        lines.forEach(line => {
+            // 빈 줄은 건너뜀
+            if (!line.trim()) return;
+
+            // 쉼표로 데이터 분할 및 공백 제거
+            const tokens = line.split(',').map(token => token.trim());
+
+            // ATCF 형식에서 세 번째 항목(인덱스 2)이 날짜+시간 정보 (예: 2026060100)
+            if (tokens.length > 2) {
+                const dateTimeStr = tokens[2];
+                
+                // 날짜 스트링이 최소 년월일시(10자리) 이상인지 확인
+                if (dateTimeStr.length >= 10) {
+                    // 마지막 두 자리(시) 추출
+                    const hour = dateTimeStr.substring(dateTimeStr.length - 2);
+
+                    // 00, 06, 12, 18시에 해당하는 경우에만 결과 배열에 추가
+                    if (allowedHours.includes(hour)) {
+                        resultLines.push(line);
+                    }
+                }
+            }
+        });
+
+        // 결과를 텍스트 영역에 출력
+        document.getElementById('outputData').value = resultLines.join('\n');
+    }
+</script>
+
+</body>
+</html>
