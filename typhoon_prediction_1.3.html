@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>글로벌 기상 AI 시뮬레이션 플랫폼 (최종 완성본)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #1a1a24;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { margin-bottom: 5px; color: #4facfe; }
+        p { color: #aaa; margin-bottom: 20px; text-align: center; }
+        .container {
+            width: 95%;
+            max-width: 1100px;
+            background: #242432;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        /* 제어 패널 디자인 고도화 */
+        .control-panel {
+            background: #2d2d3f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .env-row {
+            display: flex;
+            gap: 15px;
+            width: 90%;
+            max-width: 800px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .env-card {
+            background: #1a1a24;
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid #4facfe;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .env-card label { font-weight: bold; color: #00f2fe; font-size: 14px; }
+        .env-card select {
+            background: #2d2d3f;
+            color: #fff;
+            border: 1px solid #4facfe;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .sst-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #1a1a24;
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: 1px solid #4facfe;
+            width: 90%;
+            max-width: 500px;
+            justify-content: space-between;
+        }
+        .sst-control input[type="range"] { flex-grow: 1; margin: 0 10px; cursor: pointer; }
+        #sstVal { font-size: 16px; color: #ff5100; font-weight: bold; min-width: 50px; }
+
+        .mode-selector {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .mode-btn {
+            background: #1a1a24;
+            border: 2px solid #3b3b4f;
+            color: #ccc;
+            padding: 8px 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .mode-btn.active {
+            border-color: #00f2fe;
+            color: #00f2fe;
+            background: rgba(0, 242, 254, 0.1);
+        }
+
+        #map {
+            width: 100%;
+            height: 480px;
+            border-radius: 10px;
+            border: 2px solid #3b3b4f;
+        }
+
+        .equator-label {
+            color: #ff3333;
+            font-weight: bold;
+            font-size: 12px;
+            letter-spacing: 2px;
+            background: rgba(26, 26, 36, 0.85);
+            padding: 2px 6px;
+            border: 1px solid #ff3333;
+            border-radius: 4px;
+            white-space: nowrap;
+            text-shadow: 0 0 3px #000;
+        }
+
+        .dashboard {
+            margin-top: 20px;
+            width: 100%;
+            border-collapse: collapse;
+            background: #1d1d2b;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .dashboard th, .dashboard td {
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #2d2d3f;
+            font-size: 14px;
+        }
+        .dashboard th { background-color: #2d2d3f; color: #00f2fe; }
+        .dashboard input[type="number"] {
+            background: #1a1a24;
+            border: 1px solid #4facfe;
+            color: #fff;
+            padding: 5px;
+            border-radius: 4px;
+            width: 95px;
+            text-align: center;
+        }
+
+        .section-title {
+            margin-top: 25px;
+            font-size: 16px;
+            color: #00f2fe;
+            font-weight: bold;
+            border-left: 4px solid #00f2fe;
+            padding-left: 8px;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button.main-btn {
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button.reset { background: linear-gradient(135deg, #f53d3d 0%, #ff7676 100%); border:none; color:white; padding:12px 24px; font-weight:bold; border-radius:8px; cursor:pointer;}
+        #info { margin-top: 15px; font-size: 14px; color: #00ffcc; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h1>🌀 글로벌 통합 기상 AI 시뮬레이션 플랫폼</h1>
+    <p>반구별 전향력 대칭성과 월별 시즈널 잠열 에너지를 통제하는 기상학적 마스터 피스 시스템입니다.</p>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="env-row">
+                <div class="env-card">
+                    <label>🌐 분석 대상 반구</label>
+                    <select id="hemisphereSelect">
+                        <option value="NH" selected>북반구 (Northern Hemisphere)</option>
+                        <option value="SH">남반구 (Southern Hemisphere)</option>
+                    </select>
+                </div>
+                <div class="env-card">
+                    <label>📅 시뮬레이션 월(Month)</label>
+                    <select id="monthSelect">
+                        <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+                        <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+                        <option value="7">7월</option><option value="8" selected>8월</option><option value="9">9월</option>
+                        <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sst-control">
+                <label>🌡️ 해수면 온도(SST) 설정</label>
+                <input type="range" id="sstSlider" min="25" max="32" step="0.5" value="28.5">
+                <span id="sstVal">28.5°C</span>
+            </div>
+            
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="setClickMode('typhoon')">🌀 태풍 경로 마킹</button>
+                <button class="mode-btn" onclick="setClickMode('high')">🔵 고기압(H) 배치</button>
+                <button class="mode-btn" onclick="setClickMode('tropical_low')">🔴 열대저기압(TL) 배치</button>
+                <button class="mode-btn" onclick="setClickMode('extra_low')">🟢 온대저기압(EL) 배치</button>
+            </div>
+        </div>
+
+        <div id="map"></div>
+        
+        <div class="controls">
+            <button class="main-btn" id="predictBtn">종합 AI 시뮬레이션 실행</button>
+            <button class="reset" id="resetBtn">초기화</button>
+        </div>
+        
+        <div id="info">데이터 입력 대기 중...</div>
+
+        <div class="section-title">✏️ 과거 태풍 경로 및 제원 통합 관리 (전면 수정 가능)</div>
+        <table class="dashboard">
+            <thead>
+                <tr>
+                    <th>포인트 식별자</th>
+                    <th>위도 (N/S)</th>
+                    <th>경도 (E/W)</th>
+                    <th>중심 기압 (hPa)</th>
+                    <th>최대 풍속 (m/s)</th>
+                </tr>
+            </thead>
+            <tbody id="editTableBody">
+                <tr><td colspan="5" style="color: #aaa;">등록된 경로 점이 없습니다. 지도를 클릭해 주세요.</td></tr>
+            </tbody>
+        </table>
+
+        <div id="predictionSection" style="display: none;">
+            <div class="section-title">🔮 AI 미래 경로 및 세력 예측 결과 (120시간 글로벌 확장형)</div>
+            <table class="dashboard">
+                <thead>
+                    <tr>
+                        <th>예보 시점</th>
+                        <th>예측 위치 (위도, 경도)</th>
+                        <th>중심 기압</th>
+                        <th>1분 최대 풍속</th>
+                        <th>태풍/저기압 세력 등급</th>
+                    </tr>
+                </thead>
+                <tbody id="predictTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 글로벌 관측 뷰를 위해 중앙 초점을 위도 0도 근처로 배치
+        const map = L.map('map').setView([0.0, 130.0], 3); 
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // 정적 고정 레이어: 적도선
+        L.polyline([[0, -180], [0, 180]], { color: '#ff3333', weight: 2, dashArray: '10, 10', interactive: false }).addTo(map);
+        [90, 130, 170].forEach(lng => {
+            L.marker([0, lng], {
+                icon: L.divIcon({ className: 'custom-equator-label', html: `<div class="equator-label">⚠️ EQUATOR (적도)</div>`, iconSize: [120, 20], iconAnchor: [60, 10] }),
+                interactive: false
+            }).addTo(map);
+        });
+
+        let points = [];          
+        let highPressures = [];   
+        let tropicalLows = [];    
+        let extraLows = [];       
+        let mapElements = [];     
+        let clickMode = 'typhoon'; 
+        let systemIdCounter = 0;   
+
+        const sstSlider = document.getElementById('sstSlider');
+        const sstVal = document.getElementById('sstVal');
+        sstSlider.addEventListener('input', (e) => {
+            sstVal.innerText = parseFloat(e.target.value).toFixed(1) + "°C";
+        });
+
+        // 반구 변경 시 기존 마킹 초기화 경고 및 처리 (좌표계 역전 대응)
+        document.getElementById('hemisphereSelect').addEventListener('change', () => {
+            document.getElementById('resetBtn').click();
+            document.getElementById('info').innerText = "반구가 변경되어 시스템이 초기화되었습니다. 지도를 새로 마킹해 주세요.";
+        });
+
+        function setClickMode(mode) {
+            clickMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            const hemi = document.getElementById('hemisphereSelect').value;
+
+            // 물리 가드라인: 선택한 반구 영역과 클릭 위치의 정합성 확인 검증
+            if (hemi === 'NH' && lat < 0) { alert("현재 북반구 모드입니다. 적도 북측을 클릭해 주세요."); return; }
+            if (hemi === 'SH' && lat > 0) { alert("현재 남반구 모드입니다. 적도 남측을 클릭해 주세요."); return; }
+
+            systemIdCounter++;
+            if (clickMode === 'typhoon') {
+                points.push({ 
+                    lat: parseFloat(lat.toFixed(2)), 
+                    lng: parseFloat(lng.toFixed(2)), 
+                    t: points.length,
+                    pressure: 984 - (points.length * 4),
+                    wind: 23 + (points.length * 3)
+                });
+                updateEditTable();
+            } else if (clickMode === 'high') {
+                highPressures.push({ id: systemIdCounter, lat, lng });
+            } else if (clickMode === 'tropical_low') {
+                tropicalLows.push({ id: systemIdCounter, lat, lng });
+            } else if (clickMode === 'extra_low') {
+                extraLows.push({ id: systemIdCounter, lat, lng });
+            }
+            renderAll();
+        });
+
+        function syncData(index, field, value) {
+            let numVal = parseFloat(value);
+            if (isNaN(numVal)) return;
+            points[index][field] = numVal;
+            if (field === 'lat' || field === 'lng') renderAll();
+        }
+
+        function updateEditTable() {
+            const tbody = document.getElementById('editTableBody');
+            if(points.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="color: #aaa;">등록된 경로 점이 없습니다. 지도를 클릭해 주세요.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = "";
+            points.forEach((p, idx) => {
+                const row = `<tr>
+                    <td style="color:#00f2fe; font-weight:bold;">T - ${idx}</td>
+                    <td><input type="number" step="0.01" value="${p.lat.toFixed(2)}" oninput="syncData(${idx}, 'lat', this.value)">°</td>
+                    <td><input type="number" step="0.01" value="${p.lng.toFixed(2)}" oninput="syncData(${idx}, 'lng', this.value)">°</td>
+                    <td><input type="number" value="${p.pressure}" oninput="syncData(${idx}, 'pressure', this.value)"> hPa</td>
+                    <td><input type="number" value="${p.wind}" oninput="syncData(${idx}, 'wind', this.value)"> m/s</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function handleMarkerDrag(id, type, newLat, newLng) {
+            if (type === 'high') {
+                let obj = highPressures.find(h => h.id === id); if (obj) { obj.lat = newLat; obj.lng = newLng; }
+            } else if (type === 'tropical') {
+                let obj = tropicalLows.find(l => l.id === id); if (obj) { obj.lat = newLat; obj.lng = newLng; }
+            } else if (type === 'extra') {
+                let obj = extraLows.find(l => l.id === id); if (obj) { obj.lat = newLat; obj.lng = newLng; }
+            }
+            renderAll();
+        }
+
+        function renderAll() {
+            mapElements.forEach(el => map.removeLayer(el));
+            mapElements = [];
+
+            if (points.length > 0) {
+                const latlngs = points.map(p => [p.lat, p.lng]);
+                mapElements.push(L.polyline(latlngs, {color: '#00f2fe', weight: 4}).addTo(map));
+                points.forEach((p, idx) => {
+                    const isLast = (idx === points.length - 1);
+                    mapElements.push(L.circleMarker([p.lat, p.lng], { radius: isLast ? 8 : 4, fillColor: isLast ? '#ff007f' : '#00f2fe', color: '#fff', weight: 1, fillOpacity: 1 }).addTo(map));
+                });
+            }
+
+            highPressures.forEach(hp => {
+                const marker = L.marker([hp.lat, hp.lng], { draggable: true, icon: L.divIcon({ className: 'custom-div-icon', html: "<div style='color:#00c3ff; font-weight:bold; font-size:22px; text-shadow:0 0 5px #000; cursor:grab;'>H</div>" })}).addTo(map);
+                marker.on('dragend', function(e) { handleMarkerDrag(hp.id, 'high', e.target.getLatLng().lat, e.target.getLatLng().lng); });
+                mapElements.push(marker);
+                mapElements.push(L.circle([hp.lat, hp.lng], { radius: 450000, color: '#00c3ff', weight: 1, fillColor: '#00c3ff', fillOpacity: 0.04 }).addTo(map));
+            });
+
+            tropicalLows.forEach(tl => {
+                const marker = L.marker([tl.lat, tl.lng], { draggable: true, icon: L.divIcon({ className: 'custom-div-icon', html: "<div style='color:#ff3333; font-weight:bold; font-size:20px; text-shadow:0 0 5px #000; cursor:grab;'>TL</div>" })}).addTo(map);
+                marker.on('dragend', function(e) { handleMarkerDrag(tl.id, 'tropical', e.target.getLatLng().lat, e.target.getLatLng().lng); });
+                mapElements.push(marker);
+                mapElements.push(L.circle([tl.lat, tl.lng], { radius: 350000, color: '#ff3333', weight: 1, fillColor: '#ff3333', fillOpacity: 0.04 }).addTo(map));
+            });
+
+            extraLows.forEach(el => {
+                const marker = L.marker([el.lat, el.lng], { draggable: true, icon: L.divIcon({ className: 'custom-div-icon', html: "<div style='color:#2ee55c; font-weight:bold; font-size:20px; text-shadow:0 0 5px #000; cursor:grab;'>EL</div>" })}).addTo(map);
+                marker.on('dragend', function(e) { handleMarkerDrag(el.id, 'extra', e.target.getLatLng().lat, e.target.getLatLng().lng); });
+                mapElements.push(marker);
+                mapElements.push(L.circle([el.lat, el.lng], { radius: 300000, color: '#2ee55c', weight: 1, fillColor: '#2ee55c', fillOpacity: 0.04 }).addTo(map));
+            });
+        }
+
+        function getSSHSClass(msWindSpeed, isExtratropical) {
+            if (isExtratropical) return "<span style='color:#2ee55c; font-weight:bold; text-shadow:0 0 4px #000;'>EL (온대저기압 변질)</span>";
+            const knots = msWindSpeed * 1.94384;
+            if (knots >= 137) return "<span style='color:#ff0022; font-weight:bold; text-shadow:0 0 4px #000;'>Category 5</span>";
+            if (knots >= 113) return "<span style='color:#ff4d00; font-weight:bold;'>Category 4</span>";
+            if (knots >= 96)  return "<span style='color:#ff8800; font-weight:bold;'>Category 3</span>";
+            if (knots >= 83)  return "<span style='color:#ffb700; font-weight:bold;'>Category 2</span>";
+            if (knots >= 64)  return "<span style='color:#ffea00; font-weight:bold;'>Category 1</span>";
+            if (knots >= 34)  return "<span style='color:#00d5ff; font-weight:bold;'>TS (열대폭풍)</span>";
+            return "<span style='color:#aaa;'>TD (열대저압부)</span>";
+        }
+
+        function predictNextRoute() {
+            if (points.length === 0) { alert("태풍의 경로 데이터를 입력해 주세요."); return; }
+
+            const currentSST = parseFloat(sstSlider.value); 
+            const hemisphere = document.getElementById('hemisphereSelect').value; // 'NH' 또는 'SH'
+            const selectedMonth = parseInt(document.getElementById('monthSelect').value);
+
+            let predictedData = [];
+            const lastPoint = points[points.length - 1];
+            
+            // 초기 모멘텀 속도 산출
+            let baseLatVel = 1.6, baseLngVel = -0.6; 
+            if (points.length >= 2) {
+                baseLatVel = lastPoint.lat - points[points.length - 2].lat;
+                baseLngVel = lastPoint.lng - points[points.length - 2].lng;
+            } else {
+                // 남반구일 경우 초기 관성 이동 벡터를 남하(위도 감소) 방향으로 대칭 전환
+                if (hemisphere === 'SH') baseLatVel = -1.6;
+            }
+
+            let currentLat = lastPoint.lat, currentLng = lastPoint.lng;
+            let currentPressure = lastPoint.pressure, currentWind = lastPoint.wind;
+            let isExtratropical = false;
+
+            // 🌟 월별(Month) & 반구별(Hemisphere) 열역학 에너지 감쇄 가중치 계수 산출 알고리즘
+            let monthFactor = 0;
+            if (hemisphere === 'NH') {
+                // 북반구는 8~9월 최대 발달(+), 1~2월 최소 발달(-)
+                monthFactor = Math.sin((selectedMonth - 5) * (Math.PI / 6)) * 4.0;
+            } else {
+                // 남반구는 1~2월 최대 발달(+), 7~8월 최소 발달(-)
+                monthFactor = Math.sin((selectedMonth - 11) * (Math.PI / 6)) * 4.0;
+            }
+            const finalSstEnergy = ((currentSST - 26.5) * 2.5) + monthFactor;
+
+            for (let step = 1; step <= 5; step++) {
+                let forceLat = 0, forceLng = 0;
+                let nearHighPressure = false, nearTropicalLow = false;
+                let elAttenuationFactor = 0;
+
+                // 전향력 벡터 승수 (북반구 1, 남반구 -1)
+                const coriolisMult = (hemisphere === 'NH') ? 1.0 : -1.0;
+
+                highPressures.forEach(hp => {
+                    const dLat = currentLat - hp.lat; const dLng = currentLng - hp.lng;
+                    const dist = Math.sqrt(dLat*dLat + dLng*dLng) + 1.0; const pushFactor = 8.0 / (dist * dist);
+                    // 🌟 남반구 고기압은 시계 반대방향 회전이므로 전향력 승수(coriolisMult) 결합 연산
+                    forceLat += (dLat * pushFactor) + (dLng * pushFactor * 0.5 * coriolisMult); 
+                    forceLng += (dLng * pushFactor) - (dLat * pushFactor * 0.5 * coriolisMult);
+                    if(dist < 6) nearHighPressure = true;
+                });
+
+                tropicalLows.forEach(tl => {
+                    const dLat = tl.lat - currentLat; const dLng = tl.lng - currentLng;
+                    const dist = Math.sqrt(dLat*dLat + dLng*dLng) + 1.0; const pullFactor = 9.0 / (dist * dist); 
+                    forceLat += (dLat * pullFactor) - (dLng * pullFactor * 0.4 * coriolisMult); 
+                    forceLng += (dLng * pullFactor) + (dLat * pullFactor * 0.4 * coriolisMult);
+                    if(dist < 5) nearTropicalLow = true;
+                });
+
+                extraLows.forEach(el => {
+                    const dLat = el.lat - currentLat; const dLng = el.lng - currentLng;
+                    const dist = Math.sqrt(dLat*dLat + dLng*dLng) + 1.0; const pullFactor = 12.0 / (dist * dist);
+                    forceLat += (dLat * pullFactor) - (dLng * pullFactor * 0.3 * coriolisMult); 
+                    forceLng += (dLng * pullFactor) + (dLat * pullFactor * 0.3 * coriolisMult);
+                    if (dist < 8) { elAttenuationFactor += (25.0 / dist); }
+                });
+
+                // 기본 이동 방향에 전향력 외력 결합
+                let finalLatVel = baseLatVel + forceLat;
+                let finalLngVel = baseLngVel + forceLng;
+                
+                // 🌟 남/북반구 자연 전향 효과 편향력 주입 (북반구는 점차 북동진 우회, 남반구는 점차 남동진 우회)
+                finalLatVel += (0.15 * coriolisMult);
+
+                currentLat += finalLatVel; 
+                currentLng += finalLngVel;
+
+                // 🌟 적도 교차 돌파 방지 물리 가드레일 (남/북반구 좌표 절대성 제어)
+                if (hemisphere === 'NH' && currentLat < 1.0) currentLat = 1.0;
+                if (hemisphere === 'SH' && currentLat > -1.0) currentLat = -1.0;
+
+                // 세력 변동 연산부
+                const absoluteLat = Math.abs(currentLat);
+                if (elAttenuationFactor > 0) {
+                    currentPressure += (elAttenuationFactor * 1.5); currentWind -= (elAttenuationFactor * 0.9);
+                    if (elAttenuationFactor > 4.5 || absoluteLat > 36) { isExtratropical = true; }
+                } else if (nearHighPressure) { 
+                    currentPressure += 2; currentWind += 4; 
+                } else if (nearTropicalLow) { 
+                    currentPressure -= 6; currentWind += 6; 
+                } else if (absoluteLat > 33) { 
+                    const northernAtten = Math.max(2, 12 - (currentSST - 28));
+                    currentPressure += northernAtten; currentWind -= (northernAtten / 2); 
+                } else {
+                    currentPressure -= (2 + finalSstEnergy); currentWind += (1 + (finalSstEnergy * 0.6)); 
+                }
+
+                if (currentPressure < 850) currentPressure = 850;
+                if (currentPressure > 1012) currentPressure = 1012; 
+                if (currentWind > 85) currentWind = 85;
+                if (currentWind < 8) currentWind = 8;
+
+                predictedData.push({
+                    step: step * 24, lat: currentLat, lng: currentLng,
+                    pressure: Math.round(currentPressure), wind: Math.round(currentWind), isEL: isExtratropical
+                });
+                
+                baseLatVel = finalLatVel * 0.82; baseLngVel = finalLngVel * 0.82;
+            }
+
+            renderAll(); 
+            const pathCoords = [[lastPoint.lat, lastPoint.lng], ...predictedData.map(d => [d.lat, d.lng])];
+            mapElements.push(L.polyline(pathCoords, { color: '#ff3333', weight: 4, dashArray: '5, 10' }).addTo(map));
+
+            const pTableBody = document.getElementById('predictTableBody');
+            pTableBody.innerHTML = ""; 
+
+            predictedData.forEach(d => {
+                const uncertaintyRadius = (d.step / 24) * 130000 * (1 + (d.step / 120) * 0.3);
+                const circleColor = d.isEL ? '#2ee55c' : '#ff3333';
+                mapElements.push(L.circle([d.lat, d.lng], { radius: uncertaintyRadius, color: circleColor, weight: 1, fillColor: circleColor, fillOpacity: 0.08 }).addTo(map));
+
+                const knots = Math.round(d.wind * 1.94384);
+                const predMarker = L.circleMarker([d.lat, d.lng], { radius: 5, fillColor: circleColor, color: '#fff', weight: 1 }).addTo(map);
+                
+                const latTypeStr = d.lat >= 0 ? 'N' : 'S';
+                predMarker.bindTooltip(`<b>+${d.step}h 예보</b><br>기압: ${d.pressure} hPa<br>위도: ${Math.abs(d.lat).toFixed(1)}°${latTypeStr}`, { permanent: true, direction: 'right' });
+                mapElements.push(predMarker);
+
+                const row = `<tr>
+                    <td><b>+${d.step}시간 후 (${Math.round(d.step/24)}일 후)</b></td>
+                    <td>${Math.abs(d.lat).toFixed(2)}°${latTypeStr}, ${d.lng.toFixed(2)}°E</td>
+                    <td>${d.pressure} hPa</td>
+                    <td><b>${knots} kt</b> (${d.wind} m/s)</td>
+                    <td>${getSSHSClass(d.wind, d.isEL)}</td>
+                </tr>`;
+                pTableBody.innerHTML += row;
+            });
+
+            document.getElementById('predictionSection').style.display = "block";
+            document.getElementById('info').innerText = `🔮 [${hemisphere === 'NH' ? '북반구' : '남반구'} / ${selectedMonth}월] 시즈널 앙상블 역학 시뮬레이션 최종 연산 완료!`;
+        }
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            points = []; highPressures = []; tropicalLows = []; extraLows = []; renderAll(); updateEditTable();
+            document.getElementById('predictionSection').style.display = "none"; document.getElementById('info').innerText = "데이터 입력 대기 중...";
+        });
+        document.getElementById('predictBtn').addEventListener('click', predictNextRoute);
+    </script>
+</body>
+</html>
