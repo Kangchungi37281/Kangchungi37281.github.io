@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>글로벌 기상 AI 시뮬레이션 플랫폼 (육지 상륙 마찰 시스템 통합)</title>
+    <title>글로벌 기상 AI 시뮬레이션 플랫폼 (점진적 상륙 감쇄 시스템)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -183,7 +183,7 @@
 <body>
 
     <h1>🌀 글로벌 통합 기상 AI 시뮬레이션 플랫폼</h1>
-    <p>반구별 전향력, 월별 수온 에너지와 더불어 <b>육지 상륙 시 마찰 감쇄 물리 엔진</b>이 작동합니다.</p>
+    <p>반구별 전향력, 월별 수온 에너지와 더불어 <b>완만하게 세력이 꺾이는 상륙 감쇄 물리 엔진</b>이 작동합니다.</p>
 
     <div class="container">
         <div class="control-panel">
@@ -246,7 +246,7 @@
         </table>
 
         <div id="predictionSection" style="display: none;">
-            <div class="section-title">🔮 AI 미래 경로 및 세력 예측 결과 (지면 마찰 레이어 적용됨)</div>
+            <div class="section-title">🔮 AI 미래 경로 및 세력 예측 결과 (완만한 지면 저항 레이어 적용됨)</div>
             <table class="dashboard">
                 <thead>
                     <tr>
@@ -269,7 +269,6 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // 정적 고정 레이어: 적도선
         L.polyline([[0, -180], [0, 180]], { color: '#ff3333', weight: 2, dashArray: '10, 10', interactive: false }).addTo(map);
         [90, 130, 170].forEach(lng => {
             L.marker([0, lng], {
@@ -403,30 +402,21 @@
             });
         }
 
-        // 🌟 육지 상륙(Landfall) 기하학적 판정 레이어 함수
-        // 동아시아 주요 대륙 및 일본 열도, 필리핀 등 주요 육지 바운딩 박스 세그먼트 매핑
+        // 육지 상륙 판정 함수
         function checkIsLand(lat, lng) {
-            // 1. 중국 대륙 및 인도차이나반도 거대 육지 벨트
-            if (lat >= 10 && lat <= 45 && lng >= 100 && lng <= 120.5) return true;
-            // 2. 한반도 전체 영역
-            if (lat >= 33.0 && lat <= 43.0 && lng >= 124.0 && lng <= 130.5) return true;
-            // 3. 일본 본토 열도 (큐슈, 혼슈, 홋카이도 라인)
+            if (lat >= 10 && lat <= 45 && lng >= 100 && lng <= 120.5) return true; // 중국 대륙
+            if (lat >= 33.0 && lat <= 43.0 && lng >= 124.0 && lng <= 130.5) return true; // 한반도
             if (lat >= 30.0 && lat <= 46.0 && lng >= 130.0 && lng <= 146.0) {
-                // 단, 관측 선상의 동쪽 태평양 완전 해상 구역 제외 필터링
                 if (lat < 35 && lng > 140) return false;
-                return true;
+                return true; // 일본 본토
             }
-            // 4. 필리핀 군도 영역
-            if (lat >= 5.0 && lat <= 19.5 && lng >= 119.5 && lng <= 126.5) return true;
-            // 5. 타이완 섬
-            if (lat >= 21.8 && lat <= 25.5 && lng >= 120.0 && lng <= 122.5) return true;
-            
+            if (lat >= 5.0 && lat <= 19.5 && lng >= 119.5 && lng <= 126.5) return true; // 필리핀
+            if (lat >= 21.8 && lat <= 25.5 && lng >= 120.0 && lng <= 122.5) return true; // 타이완
             return false;
         }
 
         function getSSHSClass(msWindSpeed, isExtratropical, isLandfall) {
             if (isExtratropical) return "<span style='color:#2ee55c; font-weight:bold;'>EL (온대저기압 변질)</span>";
-            if (isLandfall && msWindSpeed < 17) return "<span style='color:#777; font-weight:bold;'>지면 마찰 소멸 (LDF)</span>";
             
             const knots = msWindSpeed * 1.94384;
             if (knots >= 137) return "<span style='color:#ff0022; font-weight:bold; text-shadow:0 0 4px #000;'>Category 5</span>";
@@ -435,7 +425,8 @@
             if (knots >= 83)  return "<span style='color:#ffb700; font-weight:bold;'>Category 2</span>";
             if (knots >= 64)  return "<span style='color:#ffea00; font-weight:bold;'>Category 1</span>";
             if (knots >= 34)  return "<span style='color:#00d5ff; font-weight:bold;'>TS (열대폭풍)</span>";
-            return "<span style='color:#aaa;'>TD (열대저압부)</span>";
+            if (msWindSpeed >= 17) return "<span style='color:#aaa;'>TD (열대저압부)</span>";
+            return "<span style='color:#777;'>💡 내륙 저기압 소멸 단계</span>";
         }
 
         function predictNextRoute() {
@@ -509,14 +500,20 @@
                 if (hemisphere === 'NH' && currentLat < 1.0) currentLat = 1.0;
                 if (hemisphere === 'SH' && currentLat > -1.0) currentLat = -1.0;
 
-                // 🌟 육지 상륙에 의한 급약화 연산 핵심 제어문
+                // 상륙 여부 체크
                 const isLandfall = checkIsLand(currentLat, currentLng);
-
                 const absoluteLat = Math.abs(currentLat);
+
+                // 🌟 [수정 핵심] 완만한 내륙 감쇄 연산 알고리즘
                 if (isLandfall) {
-                    // 육지에 올라타면 잠열이 전면 차단되고 마찰력이 극대화됨
-                    currentPressure += 18.0; // 기압 폭등(1스텝당 18hPa 증가)
-                    currentWind -= 11.5;     // 최대 풍속 급강하(1스텝당 11.5m/s 감소)
+                    // 기압 상승 폭 완화 (기존 18hPa -> 6hPa로 줄여 서서히 약화)
+                    currentPressure += 6.0; 
+                    
+                    // 단순 고정 수치 감산이 아닌, 풍속에 비례한 점진적 감쇄 (강할 땐 버티고 약해질수록 서서히 줄어듦)
+                    let frictionLoss = currentWind * 0.15; 
+                    if (frictionLoss < 3.0) frictionLoss = 3.0; // 최소 감쇄 보장선
+                    currentWind -= frictionLoss;
+                    
                 } else if (elAttenuationFactor > 0) {
                     currentPressure += (elAttenuationFactor * 1.5); currentWind -= (elAttenuationFactor * 0.9);
                     if (elAttenuationFactor > 4.5 || absoluteLat > 36) { isExtratropical = true; }
@@ -534,7 +531,7 @@
                 if (currentPressure < 850) currentPressure = 850;
                 if (currentPressure > 1012) currentPressure = 1012; 
                 if (currentWind > 85) currentWind = 85;
-                if (currentWind < 5) currentWind = 5;
+                if (currentWind < 3) currentWind = 3; // 최저 하방선 확보
 
                 predictedData.push({
                     step: step * 24, lat: currentLat, lng: currentLng,
@@ -542,7 +539,9 @@
                     isEL: isExtratropical, isLand: isLandfall
                 });
                 
-                baseLatVel = finalLatVel * 0.82; baseLngVel = finalLngVel * 0.82;
+                // 내륙 상륙 시 관성에 의해 진행 속도도 완만하게 줄어들도록 보정
+                baseLatVel = finalLatVel * (isLandfall ? 0.75 : 0.82); 
+                baseLngVel = finalLngVel * (isLandfall ? 0.75 : 0.82);
             }
 
             renderAll(); 
@@ -553,18 +552,18 @@
             pTableBody.innerHTML = ""; 
 
             predictedData.forEach(d => {
-                // 상륙 시 불확실성 반경(예측 원)을 갈색으로 변경하고 대폭 축소 (세력이 약해지기 때문)
                 let circleColor = d.isEL ? '#2ee55c' : '#ff3333';
-                if (d.isLand) circleColor = '#d2691e'; // 육지 상륙 마크 (초콜릿/갈색)
+                if (d.isLand) circleColor = '#d2691e'; // 상륙 지점 브라운 컬러 표시
 
-                const uncertaintyRadius = (d.step / 24) * 130000 * (1 + (d.step / 120) * 0.3) * (d.isLand ? 0.5 : 1.0);
-                mapElements.push(L.circle([d.lat, d.lng], { radius: uncertaintyRadius, color: circleColor, weight: 1, fillColor: circleColor, fillOpacity: 0.08 }).addTo(map));
+                // 예측 오차 반경 시각화
+                const uncertaintyRadius = (d.step / 24) * 130000 * (1 + (d.step / 120) * 0.3);
+                mapElements.push(L.circle([d.lat, d.lng], { radius: uncertaintyRadius, color: circleColor, weight: 1, fillColor: circleColor, fillOpacity: 0.05 }).addTo(map));
 
                 const knots = Math.round(d.wind * 1.94384);
                 const predMarker = L.circleMarker([d.lat, d.lng], { radius: 5, fillColor: circleColor, color: '#fff', weight: 1 }).addTo(map);
                 
                 const latTypeStr = d.lat >= 0 ? 'N' : 'S';
-                const stateStr = d.isLand ? " (육상상륙 급약화)" : (d.isEL ? " (온대저기압)" : "");
+                const stateStr = d.isLand ? " (내륙 관성 진행)" : (d.isEL ? " (온대저기압)" : "");
                 predMarker.bindTooltip(`<b>+${d.step}h 예보${stateStr}</b><br>기압: ${d.pressure} hPa<br>풍속: ${knots} kt`, { permanent: true, direction: 'right' });
                 mapElements.push(predMarker);
 
@@ -579,7 +578,7 @@
             });
 
             document.getElementById('predictionSection').style.display = "block";
-            document.getElementById('info').innerText = `🔮 글로벌 지면 마찰 및 상륙 차단 알고리즘을 반영한 종합 연산이 완료되었습니다.`;
+            document.getElementById('info').innerText = `🔮 점진적인 상륙 저항과 잔류 관성을 결합한 현실적 약화 알고리즘 연산이 완료되었습니다.`;
         }
 
         document.getElementById('resetBtn').addEventListener('click', () => {
