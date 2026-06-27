@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>글로벌 기상 AI 시뮬레이션 플랫폼 (최종 완성본)</title>
+    <title>글로벌 기상 AI 시뮬레이션 플랫폼 (육지 상륙 마찰 시스템 통합)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -28,7 +28,6 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         
-        /* 제어 패널 디자인 고도화 */
         .control-panel {
             background: #2d2d3f;
             padding: 15px;
@@ -184,7 +183,7 @@
 <body>
 
     <h1>🌀 글로벌 통합 기상 AI 시뮬레이션 플랫폼</h1>
-    <p>반구별 전향력 대칭성과 월별 시즈널 잠열 에너지를 통제하는 기상학적 마스터 피스 시스템입니다.</p>
+    <p>반구별 전향력, 월별 수온 에너지와 더불어 <b>육지 상륙 시 마찰 감쇄 물리 엔진</b>이 작동합니다.</p>
 
     <div class="container">
         <div class="control-panel">
@@ -247,7 +246,7 @@
         </table>
 
         <div id="predictionSection" style="display: none;">
-            <div class="section-title">🔮 AI 미래 경로 및 세력 예측 결과 (120시간 글로벌 확장형)</div>
+            <div class="section-title">🔮 AI 미래 경로 및 세력 예측 결과 (지면 마찰 레이어 적용됨)</div>
             <table class="dashboard">
                 <thead>
                     <tr>
@@ -264,8 +263,7 @@
     </div>
 
     <script>
-        // 글로벌 관측 뷰를 위해 중앙 초점을 위도 0도 근처로 배치
-        const map = L.map('map').setView([0.0, 130.0], 3); 
+        const map = L.map('map').setView([15.0, 125.0], 4); 
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -294,7 +292,6 @@
             sstVal.innerText = parseFloat(e.target.value).toFixed(1) + "°C";
         });
 
-        // 반구 변경 시 기존 마킹 초기화 경고 및 처리 (좌표계 역전 대응)
         document.getElementById('hemisphereSelect').addEventListener('change', () => {
             document.getElementById('resetBtn').click();
             document.getElementById('info').innerText = "반구가 변경되어 시스템이 초기화되었습니다. 지도를 새로 마킹해 주세요.";
@@ -311,7 +308,6 @@
             const lng = e.latlng.lng;
             const hemi = document.getElementById('hemisphereSelect').value;
 
-            // 물리 가드라인: 선택한 반구 영역과 클릭 위치의 정합성 확인 검증
             if (hemi === 'NH' && lat < 0) { alert("현재 북반구 모드입니다. 적도 북측을 클릭해 주세요."); return; }
             if (hemi === 'SH' && lat > 0) { alert("현재 남반구 모드입니다. 적도 남측을 클릭해 주세요."); return; }
 
@@ -407,8 +403,31 @@
             });
         }
 
-        function getSSHSClass(msWindSpeed, isExtratropical) {
-            if (isExtratropical) return "<span style='color:#2ee55c; font-weight:bold; text-shadow:0 0 4px #000;'>EL (온대저기압 변질)</span>";
+        // 🌟 육지 상륙(Landfall) 기하학적 판정 레이어 함수
+        // 동아시아 주요 대륙 및 일본 열도, 필리핀 등 주요 육지 바운딩 박스 세그먼트 매핑
+        function checkIsLand(lat, lng) {
+            // 1. 중국 대륙 및 인도차이나반도 거대 육지 벨트
+            if (lat >= 10 && lat <= 45 && lng >= 100 && lng <= 120.5) return true;
+            // 2. 한반도 전체 영역
+            if (lat >= 33.0 && lat <= 43.0 && lng >= 124.0 && lng <= 130.5) return true;
+            // 3. 일본 본토 열도 (큐슈, 혼슈, 홋카이도 라인)
+            if (lat >= 30.0 && lat <= 46.0 && lng >= 130.0 && lng <= 146.0) {
+                // 단, 관측 선상의 동쪽 태평양 완전 해상 구역 제외 필터링
+                if (lat < 35 && lng > 140) return false;
+                return true;
+            }
+            // 4. 필리핀 군도 영역
+            if (lat >= 5.0 && lat <= 19.5 && lng >= 119.5 && lng <= 126.5) return true;
+            // 5. 타이완 섬
+            if (lat >= 21.8 && lat <= 25.5 && lng >= 120.0 && lng <= 122.5) return true;
+            
+            return false;
+        }
+
+        function getSSHSClass(msWindSpeed, isExtratropical, isLandfall) {
+            if (isExtratropical) return "<span style='color:#2ee55c; font-weight:bold;'>EL (온대저기압 변질)</span>";
+            if (isLandfall && msWindSpeed < 17) return "<span style='color:#777; font-weight:bold;'>지면 마찰 소멸 (LDF)</span>";
+            
             const knots = msWindSpeed * 1.94384;
             if (knots >= 137) return "<span style='color:#ff0022; font-weight:bold; text-shadow:0 0 4px #000;'>Category 5</span>";
             if (knots >= 113) return "<span style='color:#ff4d00; font-weight:bold;'>Category 4</span>";
@@ -423,19 +442,17 @@
             if (points.length === 0) { alert("태풍의 경로 데이터를 입력해 주세요."); return; }
 
             const currentSST = parseFloat(sstSlider.value); 
-            const hemisphere = document.getElementById('hemisphereSelect').value; // 'NH' 또는 'SH'
+            const hemisphere = document.getElementById('hemisphereSelect').value; 
             const selectedMonth = parseInt(document.getElementById('monthSelect').value);
 
             let predictedData = [];
             const lastPoint = points[points.length - 1];
             
-            // 초기 모멘텀 속도 산출
             let baseLatVel = 1.6, baseLngVel = -0.6; 
             if (points.length >= 2) {
                 baseLatVel = lastPoint.lat - points[points.length - 2].lat;
                 baseLngVel = lastPoint.lng - points[points.length - 2].lng;
             } else {
-                // 남반구일 경우 초기 관성 이동 벡터를 남하(위도 감소) 방향으로 대칭 전환
                 if (hemisphere === 'SH') baseLatVel = -1.6;
             }
 
@@ -443,13 +460,10 @@
             let currentPressure = lastPoint.pressure, currentWind = lastPoint.wind;
             let isExtratropical = false;
 
-            // 🌟 월별(Month) & 반구별(Hemisphere) 열역학 에너지 감쇄 가중치 계수 산출 알고리즘
             let monthFactor = 0;
             if (hemisphere === 'NH') {
-                // 북반구는 8~9월 최대 발달(+), 1~2월 최소 발달(-)
                 monthFactor = Math.sin((selectedMonth - 5) * (Math.PI / 6)) * 4.0;
             } else {
-                // 남반구는 1~2월 최대 발달(+), 7~8월 최소 발달(-)
                 monthFactor = Math.sin((selectedMonth - 11) * (Math.PI / 6)) * 4.0;
             }
             const finalSstEnergy = ((currentSST - 26.5) * 2.5) + monthFactor;
@@ -459,13 +473,11 @@
                 let nearHighPressure = false, nearTropicalLow = false;
                 let elAttenuationFactor = 0;
 
-                // 전향력 벡터 승수 (북반구 1, 남반구 -1)
                 const coriolisMult = (hemisphere === 'NH') ? 1.0 : -1.0;
 
                 highPressures.forEach(hp => {
                     const dLat = currentLat - hp.lat; const dLng = currentLng - hp.lng;
                     const dist = Math.sqrt(dLat*dLat + dLng*dLng) + 1.0; const pushFactor = 8.0 / (dist * dist);
-                    // 🌟 남반구 고기압은 시계 반대방향 회전이므로 전향력 승수(coriolisMult) 결합 연산
                     forceLat += (dLat * pushFactor) + (dLng * pushFactor * 0.5 * coriolisMult); 
                     forceLng += (dLng * pushFactor) - (dLat * pushFactor * 0.5 * coriolisMult);
                     if(dist < 6) nearHighPressure = true;
@@ -487,23 +499,25 @@
                     if (dist < 8) { elAttenuationFactor += (25.0 / dist); }
                 });
 
-                // 기본 이동 방향에 전향력 외력 결합
                 let finalLatVel = baseLatVel + forceLat;
                 let finalLngVel = baseLngVel + forceLng;
-                
-                // 🌟 남/북반구 자연 전향 효과 편향력 주입 (북반구는 점차 북동진 우회, 남반구는 점차 남동진 우회)
                 finalLatVel += (0.15 * coriolisMult);
 
                 currentLat += finalLatVel; 
                 currentLng += finalLngVel;
 
-                // 🌟 적도 교차 돌파 방지 물리 가드레일 (남/북반구 좌표 절대성 제어)
                 if (hemisphere === 'NH' && currentLat < 1.0) currentLat = 1.0;
                 if (hemisphere === 'SH' && currentLat > -1.0) currentLat = -1.0;
 
-                // 세력 변동 연산부
+                // 🌟 육지 상륙에 의한 급약화 연산 핵심 제어문
+                const isLandfall = checkIsLand(currentLat, currentLng);
+
                 const absoluteLat = Math.abs(currentLat);
-                if (elAttenuationFactor > 0) {
+                if (isLandfall) {
+                    // 육지에 올라타면 잠열이 전면 차단되고 마찰력이 극대화됨
+                    currentPressure += 18.0; // 기압 폭등(1스텝당 18hPa 증가)
+                    currentWind -= 11.5;     // 최대 풍속 급강하(1스텝당 11.5m/s 감소)
+                } else if (elAttenuationFactor > 0) {
                     currentPressure += (elAttenuationFactor * 1.5); currentWind -= (elAttenuationFactor * 0.9);
                     if (elAttenuationFactor > 4.5 || absoluteLat > 36) { isExtratropical = true; }
                 } else if (nearHighPressure) { 
@@ -520,11 +534,12 @@
                 if (currentPressure < 850) currentPressure = 850;
                 if (currentPressure > 1012) currentPressure = 1012; 
                 if (currentWind > 85) currentWind = 85;
-                if (currentWind < 8) currentWind = 8;
+                if (currentWind < 5) currentWind = 5;
 
                 predictedData.push({
                     step: step * 24, lat: currentLat, lng: currentLng,
-                    pressure: Math.round(currentPressure), wind: Math.round(currentWind), isEL: isExtratropical
+                    pressure: Math.round(currentPressure), wind: Math.round(currentWind), 
+                    isEL: isExtratropical, isLand: isLandfall
                 });
                 
                 baseLatVel = finalLatVel * 0.82; baseLngVel = finalLngVel * 0.82;
@@ -538,29 +553,33 @@
             pTableBody.innerHTML = ""; 
 
             predictedData.forEach(d => {
-                const uncertaintyRadius = (d.step / 24) * 130000 * (1 + (d.step / 120) * 0.3);
-                const circleColor = d.isEL ? '#2ee55c' : '#ff3333';
+                // 상륙 시 불확실성 반경(예측 원)을 갈색으로 변경하고 대폭 축소 (세력이 약해지기 때문)
+                let circleColor = d.isEL ? '#2ee55c' : '#ff3333';
+                if (d.isLand) circleColor = '#d2691e'; // 육지 상륙 마크 (초콜릿/갈색)
+
+                const uncertaintyRadius = (d.step / 24) * 130000 * (1 + (d.step / 120) * 0.3) * (d.isLand ? 0.5 : 1.0);
                 mapElements.push(L.circle([d.lat, d.lng], { radius: uncertaintyRadius, color: circleColor, weight: 1, fillColor: circleColor, fillOpacity: 0.08 }).addTo(map));
 
                 const knots = Math.round(d.wind * 1.94384);
                 const predMarker = L.circleMarker([d.lat, d.lng], { radius: 5, fillColor: circleColor, color: '#fff', weight: 1 }).addTo(map);
                 
                 const latTypeStr = d.lat >= 0 ? 'N' : 'S';
-                predMarker.bindTooltip(`<b>+${d.step}h 예보</b><br>기압: ${d.pressure} hPa<br>위도: ${Math.abs(d.lat).toFixed(1)}°${latTypeStr}`, { permanent: true, direction: 'right' });
+                const stateStr = d.isLand ? " (육상상륙 급약화)" : (d.isEL ? " (온대저기압)" : "");
+                predMarker.bindTooltip(`<b>+${d.step}h 예보${stateStr}</b><br>기압: ${d.pressure} hPa<br>풍속: ${knots} kt`, { permanent: true, direction: 'right' });
                 mapElements.push(predMarker);
 
                 const row = `<tr>
                     <td><b>+${d.step}시간 후 (${Math.round(d.step/24)}일 후)</b></td>
-                    <td>${Math.abs(d.lat).toFixed(2)}°${latTypeStr}, ${d.lng.toFixed(2)}°E</td>
+                    <td>${Math.abs(d.lat).toFixed(2)}°${latTypeStr}, ${d.lng.toFixed(2)}°E ${d.isLand ? '⛰️' : '🌊'}</td>
                     <td>${d.pressure} hPa</td>
                     <td><b>${knots} kt</b> (${d.wind} m/s)</td>
-                    <td>${getSSHSClass(d.wind, d.isEL)}</td>
+                    <td>${getSSHSClass(d.wind, d.isEL, d.isLand)}</td>
                 </tr>`;
                 pTableBody.innerHTML += row;
             });
 
             document.getElementById('predictionSection').style.display = "block";
-            document.getElementById('info').innerText = `🔮 [${hemisphere === 'NH' ? '북반구' : '남반구'} / ${selectedMonth}월] 시즈널 앙상블 역학 시뮬레이션 최종 연산 완료!`;
+            document.getElementById('info').innerText = `🔮 글로벌 지면 마찰 및 상륙 차단 알고리즘을 반영한 종합 연산이 완료되었습니다.`;
         }
 
         document.getElementById('resetBtn').addEventListener('click', () => {
