@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>태풍 이름 리스트 메이커</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --bg-color: #f4f7f6;
+            --border-color: #dcdde1;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .description {
+            color: #636e72;
+            font-size: 0.95rem;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            display: flex;
+            gap: 10px;
+            background-color: var(--bg-color);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 12px 24px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        /* JSON 버튼 스타일 구분 */
+        .btn-json-export {
+            background-color: #2ecc71;
+        }
+        .btn-json-export:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-json-import {
+            background-color: #e67e22;
+        }
+        .btn-json-import:hover {
+            background-color: #d35400;
+        }
+
+        .table-container {
+            width: 100%;
+            max-width: 1200px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        .row-num {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #7f8c8d;
+            width: 50px;
+        }
+
+        input[type="text"] {
+            width: 90%;
+            padding: 8px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9rem;
+            transition: border 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border: 1px solid var(--accent-color);
+            outline: none;
+            background-color: #ebf5fb;
+        }
+
+        /* 파일 입력 창 숨김 */
+        #json-file-input {
+            display: none;
+        }
+
+        /* 내보내기용 스타일 (출력물 전용) */
+        @media print {
+            .controls, .description { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>태풍 이름 리스트 메이커</h1>
+    <p class="description">
+        이 도구는 사용자가 직접 테이블로 되어있는 태풍 이름 리스트를 만들고 수정하는 게임입니다.<br>
+        각 칸을 클릭하여 이름을 입력하고, 마무리가 되면 아래 버튼을 눌러 HTML 또는 JSON으로 저장하십시오.
+    </p>
+</header>
+
+<div class="controls">
+    <button onclick="exportToHTML()">완성된 리스트 HTML로 내보내기</button>
+    <button class="btn-json-export" onclick="exportToJSON()">중간 저장 (JSON 내보내기)</button>
+    <button class="btn-json-import" onclick="triggerJSONImport()">불러오기 (JSON 가져오기)</button>
+    <input type="file" id="json-file-input" accept=".json" onchange="importFromJSON(event)">
+</div>
+
+<div class="table-container" id="main-content">
+    <table id="typhoon-table">
+        <thead>
+            <tr>
+                <th>번호</th>
+                <th>1조</th>
+                <th>2조</th>
+                <th>3조</th>
+                <th>4조</th>
+                <th>5조</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+</div>
+
+<script>
+    // 테이블 생성 로직
+    const tbody = document.querySelector('#typhoon-table tbody');
+    const rowCount = 28;
+    const colCount = 5;
+
+    for (let i = 1; i <= rowCount; i++) {
+        const tr = document.createElement('tr');
+        
+        // 행 번호
+        const tdNum = document.createElement('td');
+        tdNum.className = 'row-num';
+        tdNum.textContent = i;
+        tr.appendChild(tdNum);
+
+        // 각 조별 입력칸
+        for (let j = 1; j <= colCount; j++) {
+            const td = document.createElement('td');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = `${j}조 이름 입력`;
+            td.appendChild(input);
+            tr.appendChild(td);
+        }
+        
+        tbody.appendChild(tr);
+    }
+
+    // HTML 내보내기 기능
+    function exportToHTML() {
+        const tableContent = document.getElementById('main-content').innerHTML;
+        const inputs = document.querySelectorAll('input[type="text"]');
+        
+        // 현재 입력된 모든 값들을 텍스트로 고정
+        const rows = document.querySelectorAll('#typhoon-table tbody tr');
+        let staticTableHtml = `
+            <table border="1" style="border-collapse: collapse; width: 100%; text-align: center; font-family: sans-serif;">
+                <thead>
+                    <tr style="background-color: #2c3e50; color: white;">
+                        <th>번호</th><th>1조</th><th>2조</th><th>3조</th><th>4조</th><th>5조</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        rows.forEach((row, idx) => {
+            staticTableHtml += `<tr><td style="background-color: #f8f9fa; font-weight: bold;">${idx + 1}</td>`;
+            const rowInputs = row.querySelectorAll('input');
+            rowInputs.forEach(input => {
+                staticTableHtml += `<td>${input.value || ''}</td>`;
+            });
+            staticTableHtml += `</tr>`;
+        });
+
+        staticTableHtml += `</tbody></table>`;
+
+        const htmlTemplate = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>완성된 태풍 이름 리스트</title>
+    <style>
+        body { padding: 40px; font-family: sans-serif; }
+        h1 { text-align: center; color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dcdde1; padding: 12px; }
+    </style>
+</head>
+<body>
+    <h1>저장된 태풍 이름 리스트</h1>
+    ${staticTableHtml}
+    <p style="text-align: right; margin-top: 20px; color: #7f8c8d;">생성일: ${new Date().toLocaleString()}</p>
+</body>
+</html>`;
+
+        const blob = new Blob([htmlTemplate], { type: 'text/html' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'my_typhoon_list.html';
+        link.click();
+    }
+
+    // JSON 내보내기 기능
+    function exportToJSON() {
+        const rows = document.querySelectorAll('#typhoon-table tbody tr');
+        const data = [];
+
+        rows.forEach((row) => {
+            const rowData = [];
+            const rowInputs = row.querySelectorAll('input');
+            rowInputs.forEach(input => {
+                rowData.push(input.value);
+            });
+            data.push(rowData);
+        });
+
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'typhoon_list_data.json';
+        link.click();
+    }
+
+    // JSON 가져오기 트리거 (숨겨진 파일 input 클릭)
+    function triggerJSONImport() {
+        document.getElementById('json-file-input').click();
+    }
+
+    // JSON 파일 읽기 및 테이블 반영 기능
+    function importFromJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (!Array.isArray(data)) {
+                    alert('올바르지 않은 데이터 형식입니다.');
+                    return;
+                }
+
+                const rows = document.querySelectorAll('#typhoon-table tbody tr');
+                rows.forEach((row, rowIndex) => {
+                    if (data[rowIndex]) {
+                        const rowInputs = row.querySelectorAll('input');
+                        rowInputs.forEach((input, colIndex) => {
+                            if (data[rowIndex][colIndex] !== undefined) {
+                                input.value = data[rowIndex][colIndex];
+                            }
+                        });
+                    }
+                });
+                // 성공 안내 알림창(alert) 제거됨
+            } catch (error) {
+                alert('JSON 파일을 읽는 중 오류가 발생했습니다.');
+            }
+        };
+        reader.readAsText(file);
+        
+        // 같은 파일을 다시 올릴 때도 이벤트가 실행되도록 초기화
+        event.target.value = '';
+    }
+</script>
+
+</body>
+</html>
