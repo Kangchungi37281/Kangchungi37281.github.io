@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 슈퍼 태풍 바비 (BAVI) 시뮬레이터</title>
+    <!-- OpenSource 지도 라이브러리 Leaflet CSS/JS 로드 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background: #111;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background: #1e1e1e;
+            padding: 15px 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border-bottom: 1px solid #333;
+            z-index: 1000;
+        }
+        h1 { margin: 0; font-size: 1.4rem; color: #ff4757; }
+        .subtitle { font-size: 0.85rem; color: #aaa; margin-top: 3px; }
+        
+        #main-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+        
+        /* 우측 컨트롤 패널 */
+        #control-panel {
+            width: 320px;
+            background: rgba(20, 20, 20, 0.95);
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-left: 1px solid #333;
+            z-index: 1000;
+        }
+        .dashboard-card {
+            background: #252525;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ff4757;
+        }
+        .dashboard-card h3 { margin: 0 0 10px 0; font-size: 0.95rem; color: #ffa502; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
+        .stat-val { font-weight: bold; color: #7bed9f; }
+
+        .btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: 0.2s;
+        }
+        .btn:hover { background: #ff6b81; }
+        .btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Typhoon BAVI (2026) Simulator</h1>
+            <div class="subtitle">2026년 제9호 슈퍼 태풍 바비 인터랙티브 이동 경로</div>
+        </div>
+    </header>
+
+    <div id="main-container">
+        <!-- 실제 지도가 렌더링되는 영역 -->
+        <div id="map"></div>
+
+        <!-- 실시간 데이터 대시보드 및 컨트롤러 -->
+        <div id="control-panel">
+            <button id="start-btn" class="btn" onclick="startSimulation()">시뮬레이션 시작</button>
+            
+            <div class="dashboard-card">
+                <h3>현재 태풍 정보</h3>
+                <div class="stat-row"><span>일시:</span><span id="info-date" class="stat-val">-</span></div>
+                <div class="stat-row"><span>위치 좌표:</span><span id="info-coord" class="stat-val">-</span></div>
+                <div class="stat-row"><span>중심기압:</span><span id="info-press" class="stat-val">-</span></div>
+                <div class="stat-row"><span>최대풍속:</span><span id="info-wind" class="stat-val">-</span></div>
+                <div class="stat-row"><span>세력 등급:</span><span id="info-class" style="color:#ff6b81; font-weight:bold;">-</span></div>
+            </div>
+
+            <div class="dashboard-card" style="border-left-color: #2ed573;">
+                <h3>시뮬레이션 안내</h3>
+                <p style="margin:0; font-size:0.85rem; line-height:1.5; color:#ccc;">
+                    마셜 제도 인근 발생 시점부터 북마리아나 제도의 <b>로타(Rota)섬</b>을 최고 등급(Cat.5)으로 강타한 뒤 필리핀해를 거쳐 북상하는 실제 경로 데이터 기반 시뮬레이터입니다.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. 지도 초기화 (서태평양 중심 설정)
+        const map = L.map('map').setView([16.0, 142.0], 4);
+
+        // 야간 위성 감성의 어두운 지도 타일 로드 (CartoDB DarkMatter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // 2. 태풍 바비 실제 시계열 경로 데이터
+        const trackData = [
+            { date: "6월 30일 (발생)", lat: 8.5, lng: 165.0, press: 1004, wind: 65, class: "열대저압부" },
+            { date: "7월 2일", lat: 10.2, lng: 155.4, press: 998, wind: 80, class: "열대폭풍" },
+            { date: "7월 3일 (급발달)", lat: 11.5, lng: 149.8, press: 965, wind: 130, class: "강한 태풍" },
+            { date: "7월 4일 (슈퍼태풍)", lat: 12.8, lng: 146.5, press: 925, wind: 240, class: "매우 강한 태풍 (Cat.4)" },
+            { date: "7월 6일 (로타섬 직격)", lat: 14.1, lng: 145.2, press: 901, wind: 285, class: "맹렬한 슈퍼태풍 (Cat.5)" },
+            { date: "7월 8일 (필리핀해)", lat: 17.5, lng: 138.0, press: 930, wind: 250, class: "매우 강한 태풍" },
+            { date: "7월 10일", lat: 21.2, lng: 130.5, press: 945, wind: 180, class: "강한 태풍" },
+            { date: "7월 11일 (현재 위치)", lat: 25.4, lng: 124.8, press: 950, wind: 150, class: "태풍" }
+        ];
+
+        let currentIndex = 0;
+        let polylinePoints = [];
+        let typhoonLayerGroup = null;
+        let routeLine = null;
+        let intervalId = null;
+
+        // 중심점 태풍 눈 아이콘
+        const typhoonIcon = L.divIcon({
+            html: '<div style="background:#ff4757; width:14px; height:14px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 15px #ff4757;"></div>',
+            className: 'custom-typhoon-icon',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        function updateDashboard(data) {
+            document.getElementById('info-date').innerText = data.date;
+            document.getElementById('info-coord').innerText = `${data.lat}°N, ${data.lng}°E`;
+            document.getElementById('info-press').innerText = `${data.press} hPa`;
+            document.getElementById('info-wind').innerText = `${data.wind} km/h`;
+            document.getElementById('info-class').innerText = data.class;
+        }
+
+        function nextStep() {
+            if (currentIndex >= trackData.length) {
+                clearInterval(intervalId);
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn').innerText = "시뮬레이션 재시작";
+                return;
+            }
+
+            const currentData = trackData[currentIndex];
+            const position = [currentData.lat, currentData.lng];
+            
+            // 이동 경로 선 그리기
+            polylinePoints.push(position);
+            if (!routeLine) {
+                routeLine = L.polyline(polylinePoints, { color: '#ff4757', weight: 4, opacity: 0.7 }).addTo(map);
+            } else {
+                routeLine.setLatLngs(polylinePoints);
+            }
+
+            // 이전 시점의 태풍 오버레이 제거
+            if (typhoonLayerGroup) {
+                map.removeLayer(typhoonLayerGroup);
+            }
+            
+            // 풍속에 비례하여 강풍 반경(원) 동적 시각화
+            const markerPoint = L.marker(position, { icon: typhoonIcon });
+            const windCircle = L.circle(position, {
+                radius: currentData.wind * 1500, 
+                color: '#ff4757',
+                fillColor: '#ff4757',
+                fillOpacity: 0.15,
+                weight: 1
+            });
+            
+            typhoonLayerGroup = L.layerGroup([windCircle, markerPoint]).addTo(map);
+            
+            // 태풍 중심을 따라 지도 화면 자동 스무스 이동
+            map.panTo(position);
+            
+            // 대시보드 텍스트 정보 업데이트
+            updateDashboard(currentData);
+            
+            currentIndex++;
+        }
+
+        function startSimulation() {
+            // 변수 초기화
+            if (intervalId) clearInterval(intervalId);
+            currentIndex = 0;
+            polylinePoints = [];
+            if (routeLine) map.removeLayer(routeLine);
+            if (typhoonLayerGroup) map.removeLayer(typhoonLayerGroup);
+            routeLine = null;
+            typhoonLayerGroup = null;
+
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('start-btn').innerText = "추적 중...";
+
+            // 1.2초 주기로 다음 이동 경로 렌더링
+            nextStep();
+            intervalId = setInterval(nextStep, 1200);
+        }
+    </script>
+</body>
+</html>
