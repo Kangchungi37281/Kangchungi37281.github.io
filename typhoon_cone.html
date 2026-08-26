@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>태풍 진로도 메이커 (m/s & SSHS 기준)</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; height: 100vh; background: #f8fafc; overflow: hidden; }
+    
+    #container { display: flex; width: 100vw; height: 100vh; flex-direction: row; }
+    
+    #sidebar {
+      width: 380px;
+      padding: 16px;
+      background: #ffffff;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    #map-wrapper { flex: 1; height: 100%; position: relative; }
+    #map { height: 100%; width: 100%; z-index: 1; }
+
+    h2 { font-size: 1.05rem; color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 5px; margin-top: 4px; }
+    
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .input-group { display: flex; flex-direction: column; gap: 3px; }
+    
+    label { font-size: 0.75rem; font-weight: 700; color: #475569; }
+    input, select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; -webkit-appearance: none; background: #fff; }
+    
+    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+    button {
+      flex: 1;
+      min-width: 70px;
+      padding: 8px 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-add { background: #0284c7; color: white; }
+    .btn-add:hover { background: #0369a1; }
+    .btn-clear { background: #ef4444; color: white; }
+    .btn-clear:hover { background: #b91c1c; }
+    .btn-export { background: #10b981; color: white; }
+    .btn-export:hover { background: #047857; }
+    .btn-json { background: #6366f1; color: white; }
+    .btn-json:hover { background: #4338ca; }
+    .btn-import { background: #8b5cf6; color: white; }
+    .btn-import:hover { background: #6d28d9; }
+    
+    #point-list {
+      list-style: none;
+      max-height: 160px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #fafafa;
+    }
+    #point-list li {
+      font-size: 0.73rem;
+      padding: 6px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      line-height: 1.2;
+    }
+
+    .sshs-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+      white-space: nowrap;
+    }
+
+    .info-text { font-size: 0.7rem; color: #64748b; margin-top: -2px; }
+
+    @media (max-width: 768px) {
+      #container { flex-direction: column-reverse; }
+      #sidebar { width: 100%; height: 50vh; box-shadow: 0 -2px 10px rgba(0,0,0,0.15); }
+      #map-wrapper { height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="container">
+  <div id="sidebar">
+    <h2>🌀 태풍 데이터 입력</h2>
+    
+    <div class="form-grid">
+      <div class="input-group">
+        <label for="sysType">저기압 유형</label>
+        <select id="sysType">
+          <option value="tropical">열대저기압 (Tropical)</option>
+          <option value="subtropical">아열대저기압 (Subtropical)</option>
+          <option value="extratropical">온대저기압 (Extratropical)</option>
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label for="pressure">중심기압 (hPa)</label>
+        <input type="number" id="pressure" step="1" value="980" placeholder="hPa">
+      </div>
+
+      <div class="input-group">
+        <label for="lat">위도 (Lat)</label>
+        <input type="number" id="lat" step="0.1" value="20.0">
+      </div>
+      
+      <div class="input-group">
+        <label for="lng">경도 (Lng)</label>
+        <input type="number" id="lng" step="0.1" value="130.0">
+      </div>
+
+      <div class="input-group">
+        <label for="wind">최대풍속 (m/s)</label>
+        <input type="number" id="wind" step="1" value="25" placeholder="m/s">
+      </div>
+
+      <div class="input-group">
+        <label for="radius">오차반경 (km)</label>
+        <input type="number" id="radius" step="10" value="50">
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn-add" onclick="addWayPoint()">지점 추가</button>
+      <button class="btn-clear" onclick="clearAll()">초기화</button>
+    </div>
+
+    <h2>💾 내보내기 / 불러오기</h2>
+    <div class="btn-group">
+      <button class="btn-export" onclick="exportMapImage()">📷 이미지 저장</button>
+      <button class="btn-json" onclick="exportJSON()">📥 JSON 저장</button>
+      <button class="btn-import" onclick="triggerImport()">📤 JSON 불러오기</button>
+      <input type="file" id="jsonInput" accept=".json" style="display:none;" onchange="importJSON(event)">
+    </div>
+
+    <p class="info-text">💡 지도를 터치/클릭하면 입력된 상태로 위치가 추가됩니다.</p>
+
+    <h2>📍 경로 데이터 목록</h2>
+    <ul id="point-list"></ul>
+  </div>
+
+  <div id="map-wrapper">
+    <div id="map"></div>
+  </div>
+</div>
+
+<!-- Leaflet JS, Turf.js, Leaflet-Image (지형 이미지 캡처 전용) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script src="https://unpkg.com/leaflet-image@0.4.0/leaflet-image.js"></script>
+
+<script>
+  // CORS 문제가 없는 CartoDB Basemap 타일 사용
+  const map = L.map('map', { tap: false, preferCanvas: true }).setView([23.0, 128.0], 5);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    crossOrigin: true
+  }).addTo(map);
+
+  let waypoints = [];
+
+  const markerLayer = L.layerGroup().addTo(map);
+  const pathLayer = L.layerGroup().addTo(map);
+  const coneLayer = L.layerGroup().addTo(map);
+
+  function getSystemInfo(sysType, msWind) {
+    if (sysType === 'extratropical') {
+      return { name: 'EXT (온대)', color: '#94a3b8', textColor: '#ffffff' };
+    }
+    
+    const knots = msWind * 1.94384;
+    const prefix = sysType === 'subtropical' ? 'Sub-' : '';
+
+    if (knots < 34) return { name: prefix + 'TD', color: '#5ebaff', textColor: '#ffffff' };
+    if (knots < 64) return { name: prefix + 'TS', color: '#00fafc', textColor: '#000000' };
+    if (knots < 83) return { name: prefix + 'Cat 1', color: '#ffffd9', textColor: '#000000' };
+    if (knots < 96) return { name: prefix + 'Cat 2', color: '#ffe775', textColor: '#000000' };
+    if (knots < 113) return { name: prefix + 'Cat 3', color: '#ffb14c', textColor: '#000000' };
+    if (knots < 137) return { name: prefix + 'Cat 4', color: '#ff6969', textColor: '#ffffff' };
+    return { name: prefix + 'Cat 5', color: '#da70d6', textColor: '#ffffff' };
+  }
+
+  function addWayPoint(latVal, lngVal, windVal, pressureVal, sysTypeVal, radVal) {
+    const lat = parseFloat(latVal || document.getElementById('lat').value);
+    const lng = parseFloat(lngVal || document.getElementById('lng').value);
+    const wind = parseFloat(windVal || document.getElementById('wind').value);
+    const pressure = parseFloat(pressureVal || document.getElementById('pressure').value);
+    const sysType = sysTypeVal || document.getElementById('sysType').value;
+    const radius = parseFloat(radVal || document.getElementById('radius').value);
+
+    if (isNaN(lat) || isNaN(lng) || isNaN(wind) || isNaN(pressure) || isNaN(radius)) {
+      alert('올바른 수치를 입력하세요.');
+      return;
+    }
+
+    const info = getSystemInfo(sysType, wind);
+    waypoints.push({ lat, lng, wind, pressure, sysType, radius, info });
+
+    document.getElementById('radius').value = radius + 30;
+    updateVisualization();
+  }
+
+  map.on('click', function(e) {
+    const wind = parseFloat(document.getElementById('wind').value);
+    const pressure = parseFloat(document.getElementById('pressure').value);
+    const sysType = document.getElementById('sysType').value;
+    const radius = parseFloat(document.getElementById('radius').value);
+    addWayPoint(e.latlng.lat.toFixed(2), e.latlng.lng.toFixed(2), wind, pressure, sysType, radius);
+  });
+
+  function updateVisualization() {
+    markerLayer.clearLayers();
+    pathLayer.clearLayers();
+    coneLayer.clearLayers();
+
+    const listEl = document.getElementById('point-list');
+    listEl.innerHTML = '';
+
+    if (waypoints.length === 0) return;
+
+    const turfBuffers = [];
+
+    waypoints.forEach((pt, idx) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div>
+          <b>#${idx + 1} (${pt.lat}, ${pt.lng})</b><br>
+          <span style="color:#64748b;">${pt.pressure}hPa / ${pt.wind}m/s / ${pt.radius}km</span>
+        </div>
+        <span class="sshs-badge" style="background-color: ${pt.info.color}; color: ${pt.info.textColor};">
+          ${pt.info.name}
+        </span>
+      `;
+      listEl.appendChild(li);
+
+      L.circleMarker([pt.lat, pt.lng], {
+        radius: 7,
+        color: '#000000',
+        weight: 1.5,
+        fillColor: pt.info.color,
+        fillOpacity: 1
+      }).bindPopup(`<b>#${idx + 1} ${pt.info.name}</b><br>기압: ${pt.pressure} hPa<br>풍속: ${pt.wind} m/s<br>오차반경: ${pt.radius} km`).addTo(markerLayer);
+
+      if (idx > 0) {
+        const prev = waypoints[idx - 1];
+        L.polyline([[prev.lat, prev.lng], [pt.lat, pt.lng]], {
+          color: pt.info.color,
+          weight: 4,
+          opacity: 0.9,
+          dashArray: pt.sysType === 'extratropical' ? '6, 6' : null
+        }).addTo(pathLayer);
+      }
+
+      const pointGeoJSON = turf.point([pt.lng, pt.lat]);
+      const buffer = turf.buffer(pointGeoJSON, pt.radius, { units: 'kilometers' });
+      turfBuffers.push(buffer);
+    });
+
+    if (turfBuffers.length > 0) {
+      let combinedCone = turfBuffers[0];
+      for (let i = 1; i < turfBuffers.length; i++) {
+        combinedCone = turf.union(combinedCone, turfBuffers[i]);
+      }
+
+      const latestColor = waypoints[waypoints.length - 1].info.color;
+
+      L.geoJSON(combinedCone, {
+        style: {
+          color: latestColor,
+          weight: 1.5,
+          fillColor: latestColor,
+          fillOpacity: 0.25
+        }
+      }).addTo(coneLayer);
+    }
+  }
+
+  // leaflet-image 라이브러리를 활용한 캔버스 직접 추출 방식
+  function exportMapImage() {
+    if (waypoints.length === 0) {
+      alert('저장할 경로 데이터가 없습니다.');
+      return;
+    }
+
+    leafletImage(map, function(err, canvas) {
+      if (err) {
+        alert('이미지 생성 중 오류가 발생했습니다: ' + err);
+        return;
+      }
+      const link = document.createElement('a');
+      link.download = `typhoon_track_${new Date().toISOString().slice(0,10)}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  }
+
+  function exportJSON() {
+    if (waypoints.length === 0) {
+      alert('내보낼 데이터가 없습니다.');
+      return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(waypoints, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `typhoon_data_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  }
+
+  function triggerImport() {
+    document.getElementById('jsonInput').click();
+  }
+
+  function importJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        if (Array.isArray(importedData)) {
+          waypoints = importedData.map(pt => ({
+            ...pt,
+            info: getSystemInfo(pt.sysType || 'tropical', pt.wind)
+          }));
+          updateVisualization();
+          alert('성공적으로 태풍 경로 데이터를 불러왔습니다.');
+        } else {
+          alert('올바르지 않은 JSON 데이터 형식입니다.');
+        }
+      } catch (err) {
+        alert('JSON 파일 읽기 실패: ' + err);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
+
+  function clearAll() {
+    waypoints = [];
+    document.getElementById('lat').value = '20.0';
+    document.getElementById('lng').value = '130.0';
+    document.getElementById('wind').value = '25';
+    document.getElementById('pressure').value = '980';
+    document.getElementById('radius').value = '50';
+    document.getElementById('sysType').value = 'tropical';
+    updateVisualization();
+  }
+</script>
+</body>
+</html>
+
