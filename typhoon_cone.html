@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>태풍 진로도 메이커 (m/s & SSHS 기준)</title>
+  <title>태풍 진로도 메이커 (Undo/Redo 지원)</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -47,18 +47,27 @@
       font-size: 0.8rem;
       font-weight: bold;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.2s, opacity 0.2s;
     }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
     .btn-add { background: #0284c7; color: white; }
-    .btn-add:hover { background: #0369a1; }
+    .btn-add:hover:not(:disabled) { background: #0369a1; }
+    .btn-undo { background: #f59e0b; color: white; }
+    .btn-undo:hover:not(:disabled) { background: #d97706; }
+    .btn-redo { background: #3b82f6; color: white; }
+    .btn-redo:hover:not(:disabled) { background: #2563eb; }
     .btn-clear { background: #ef4444; color: white; }
-    .btn-clear:hover { background: #b91c1c; }
+    .btn-clear:hover:not(:disabled) { background: #b91c1c; }
     .btn-export { background: #10b981; color: white; }
-    .btn-export:hover { background: #047857; }
+    .btn-export:hover:not(:disabled) { background: #047857; }
     .btn-json { background: #6366f1; color: white; }
-    .btn-json:hover { background: #4338ca; }
+    .btn-json:hover:not(:disabled) { background: #4338ca; }
     .btn-import { background: #8b5cf6; color: white; }
-    .btn-import:hover { background: #6d28d9; }
+    .btn-import:hover:not(:disabled) { background: #6d28d9; }
     
     #point-list {
       list-style: none;
@@ -140,8 +149,11 @@
       </div>
     </div>
 
+    <!-- 지점 추가 및 실행취소/다시실행/초기화 버튼 그룹 -->
     <div class="btn-group">
       <button class="btn-add" onclick="addWayPoint()">지점 추가</button>
+      <button class="btn-undo" id="btnUndo" onclick="undo()" disabled>↩️ 뒤로가기</button>
+      <button class="btn-redo" id="btnRedo" onclick="redo()" disabled>↪️ 되돌리기</button>
       <button class="btn-clear" onclick="clearAll()">초기화</button>
     </div>
 
@@ -153,7 +165,7 @@
       <input type="file" id="jsonInput" accept=".json" style="display:none;" onchange="importJSON(event)">
     </div>
 
-    <p class="info-text">💡 지도를 터치/클릭하면 입력된 상태로 위치가 추가됩니다.</p>
+    <p class="info-text">💡 지도를 터치/클릭하면 위치가 추가됩니다. (단축키: Ctrl+Z / Ctrl+Y)</p>
 
     <h2>📍 경로 데이터 목록</h2>
     <ul id="point-list"></ul>
@@ -164,13 +176,12 @@
   </div>
 </div>
 
-<!-- Leaflet JS, Turf.js, Leaflet-Image (지형 이미지 캡처 전용) -->
+<!-- Leaflet JS, Turf.js, Leaflet-Image -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 <script src="https://unpkg.com/leaflet-image@0.4.0/leaflet-image.js"></script>
 
 <script>
-  // CORS 문제가 없는 CartoDB Basemap 타일 사용
   const map = L.map('map', { tap: false, preferCanvas: true }).setView([23.0, 128.0], 5);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -179,10 +190,57 @@
   }).addTo(map);
 
   let waypoints = [];
+  
+  // Undo/Redo 이력 관리를 위한 스택
+  let undoStack = [];
+  let redoStack = [];
 
   const markerLayer = L.layerGroup().addTo(map);
   const pathLayer = L.layerGroup().addTo(map);
   const coneLayer = L.layerGroup().addTo(map);
+
+  // 이력 상태 기록 함수
+  function pushState() {
+    undoStack.push(JSON.stringify(waypoints));
+    redoStack = []; // 새로운 동작이 일어나면 Redo 스택 초기화
+    updateHistoryButtons();
+  }
+
+  // 뒤로가기 (Undo)
+  function undo() {
+    if (undoStack.length === 0) return;
+    
+    // 현재 상태를 Redo 스택에 저장
+    redoStack.push(JSON.stringify(waypoints));
+    
+    // 이전 상태 복원
+    const prevState = undoStack.pop();
+    waypoints = JSON.parse(prevState);
+    
+    updateVisualization();
+    updateHistoryButtons();
+  }
+
+  // 다시실행 (Redo)
+  function redo() {
+    if (redoStack.length === 0) return;
+    
+    // 현재 상태를 Undo 스택에 저장
+    undoStack.push(JSON.stringify(waypoints));
+    
+    // 취소했던 상태 복원
+    const nextState = redoStack.pop();
+    waypoints = JSON.parse(nextState);
+    
+    updateVisualization();
+    updateHistoryButtons();
+  }
+
+  // 버튼 활성화/비활성화 처리
+  function updateHistoryButtons() {
+    document.getElementById('btnUndo').disabled = undoStack.length === 0;
+    document.getElementById('btnRedo').disabled = redoStack.length === 0;
+  }
 
   function getSystemInfo(sysType, msWind) {
     if (sysType === 'extratropical') {
@@ -213,6 +271,8 @@
       alert('올바른 수치를 입력하세요.');
       return;
     }
+
+    pushState(); // 변경 전 상태 이력 추가
 
     const info = getSystemInfo(sysType, wind);
     waypoints.push({ lat, lng, wind, pressure, sysType, radius, info });
@@ -296,7 +356,6 @@
     }
   }
 
-  // leaflet-image 라이브러리를 활용한 캔버스 직접 추출 방식
   function exportMapImage() {
     if (waypoints.length === 0) {
       alert('저장할 경로 데이터가 없습니다.');
@@ -342,6 +401,7 @@
       try {
         const importedData = JSON.parse(e.target.result);
         if (Array.isArray(importedData)) {
+          pushState();
           waypoints = importedData.map(pt => ({
             ...pt,
             info: getSystemInfo(pt.sysType || 'tropical', pt.wind)
@@ -360,6 +420,9 @@
   }
 
   function clearAll() {
+    if (waypoints.length > 0) {
+      pushState();
+    }
     waypoints = [];
     document.getElementById('lat').value = '20.0';
     document.getElementById('lng').value = '130.0';
@@ -369,7 +432,19 @@
     document.getElementById('sysType').value = 'tropical';
     updateVisualization();
   }
+
+  // 키보드 단축키 이벤트 (Ctrl+Z / Ctrl+Y)
+  window.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      if (e.shiftKey) {
+        redo(); // Ctrl+Shift+Z
+      } else {
+        undo(); // Ctrl+Z
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      redo(); // Ctrl+Y
+    }
+  });
 </script>
 </body>
 </html>
-
