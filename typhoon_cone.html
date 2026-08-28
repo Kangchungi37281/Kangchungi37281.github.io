@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>태풍 진로도 메이커 (Undo/Redo 지원)</title>
+  <title>태풍 진로도 메이커 (m/s & knot 선택 지원)</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -114,6 +114,15 @@
     <h2>🌀 태풍 데이터 입력</h2>
     
     <div class="form-grid">
+      <!-- 풍속 단위 선택 추가 -->
+      <div class="input-group">
+        <label for="windUnit">풍속 단위</label>
+        <select id="windUnit" onchange="toggleWindUnit()">
+          <option value="ms">m/s (미터/초)</option>
+          <option value="kt">knot (노트)</option>
+        </select>
+      </div>
+
       <div class="input-group">
         <label for="sysType">저기압 유형</label>
         <select id="sysType">
@@ -129,6 +138,11 @@
       </div>
 
       <div class="input-group">
+        <label for="wind" id="windLabel">최대풍속 (m/s)</label>
+        <input type="number" id="wind" step="1" value="25">
+      </div>
+
+      <div class="input-group">
         <label for="lat">위도 (Lat)</label>
         <input type="number" id="lat" step="0.1" value="20.0">
       </div>
@@ -138,18 +152,13 @@
         <input type="number" id="lng" step="0.1" value="130.0">
       </div>
 
-      <div class="input-group">
-        <label for="wind">최대풍속 (m/s)</label>
-        <input type="number" id="wind" step="1" value="25" placeholder="m/s">
-      </div>
-
-      <div class="input-group">
-        <label for="radius">오차반경 (km)</label>
+      <div class="input-group" style="grid-column: span 2;">
+        <label for="radius" id="radiusLabel">오차반경 (km)</label>
         <input type="number" id="radius" step="10" value="50">
       </div>
     </div>
 
-    <!-- 지점 추가 및 실행취소/다시실행/초기화 버튼 그룹 -->
+    <!-- 실행취소 / 다시실행 / 초기화 버튼 -->
     <div class="btn-group">
       <button class="btn-add" onclick="addWayPoint()">지점 추가</button>
       <button class="btn-undo" id="btnUndo" onclick="undo()" disabled>↩️ 뒤로가기</button>
@@ -165,7 +174,7 @@
       <input type="file" id="jsonInput" accept=".json" style="display:none;" onchange="importJSON(event)">
     </div>
 
-    <p class="info-text">💡 지도를 터치/클릭하면 위치가 추가됩니다. (단축키: Ctrl+Z / Ctrl+Y)</p>
+    <p class="info-text">💡 지도를 클릭하면 데이터가 추가됩니다. (단축키: Ctrl+Z / Ctrl+Y)</p>
 
     <h2>📍 경로 데이터 목록</h2>
     <ul id="point-list"></ul>
@@ -190,8 +199,6 @@
   }).addTo(map);
 
   let waypoints = [];
-  
-  // Undo/Redo 이력 관리를 위한 스택
   let undoStack = [];
   let redoStack = [];
 
@@ -199,55 +206,66 @@
   const pathLayer = L.layerGroup().addTo(map);
   const coneLayer = L.layerGroup().addTo(map);
 
-  // 이력 상태 기록 함수
+  // 단위 전환 처리 함수 (m/s <-> knot)
+  function toggleWindUnit() {
+    const unit = document.getElementById('windUnit').value;
+    const windInput = document.getElementById('wind');
+    const windLabel = document.getElementById('windLabel');
+    const radiusInput = document.getElementById('radius');
+    const radiusLabel = document.getElementById('radiusLabel');
+
+    let windVal = parseFloat(windInput.value) || 0;
+    let radiusVal = parseFloat(radiusInput.value) || 0;
+
+    if (unit === 'kt') {
+      windLabel.textContent = '최대풍속 (knot)';
+      radiusLabel.textContent = '오차반경 (NM)';
+      windInput.value = Math.round(windVal * 1.94384);
+      radiusInput.value = Math.round(radiusVal * 0.539957);
+    } else {
+      windLabel.textContent = '최대풍속 (m/s)';
+      radiusLabel.textContent = '오차반경 (km)';
+      windInput.value = Math.round(windVal / 1.94384);
+      radiusInput.value = Math.round(radiusVal / 0.539957);
+    }
+    updateVisualization();
+  }
+
   function pushState() {
     undoStack.push(JSON.stringify(waypoints));
-    redoStack = []; // 새로운 동작이 일어나면 Redo 스택 초기화
+    redoStack = [];
     updateHistoryButtons();
   }
 
-  // 뒤로가기 (Undo)
   function undo() {
     if (undoStack.length === 0) return;
-    
-    // 현재 상태를 Redo 스택에 저장
     redoStack.push(JSON.stringify(waypoints));
-    
-    // 이전 상태 복원
     const prevState = undoStack.pop();
     waypoints = JSON.parse(prevState);
-    
     updateVisualization();
     updateHistoryButtons();
   }
 
-  // 다시실행 (Redo)
   function redo() {
     if (redoStack.length === 0) return;
-    
-    // 현재 상태를 Undo 스택에 저장
     undoStack.push(JSON.stringify(waypoints));
-    
-    // 취소했던 상태 복원
     const nextState = redoStack.pop();
     waypoints = JSON.parse(nextState);
-    
     updateVisualization();
     updateHistoryButtons();
   }
 
-  // 버튼 활성화/비활성화 처리
   function updateHistoryButtons() {
     document.getElementById('btnUndo').disabled = undoStack.length === 0;
     document.getElementById('btnRedo').disabled = redoStack.length === 0;
   }
 
-  function getSystemInfo(sysType, msWind) {
+  // SSHS 등급 계산 (내부 연산은 항상 Knot 기준)
+  function getSystemInfo(sysType, knots) {
     if (sysType === 'extratropical') {
       return { name: 'EXT (온대)', color: '#94a3b8', textColor: '#ffffff' };
     }
     
-    const knots = msWind * 1.94384;
     const prefix = sysType === 'subtropical' ? 'Sub-' : '';
 
     if (knots < 34) return { name: prefix + 'TD', color: '#5ebaff', textColor: '#ffffff' };
@@ -262,22 +280,31 @@
   function addWayPoint(latVal, lngVal, windVal, pressureVal, sysTypeVal, radVal) {
     const lat = parseFloat(latVal || document.getElementById('lat').value);
     const lng = parseFloat(lngVal || document.getElementById('lng').value);
-    const wind = parseFloat(windVal || document.getElementById('wind').value);
+    const windInputVal = parseFloat(windVal || document.getElementById('wind').value);
     const pressure = parseFloat(pressureVal || document.getElementById('pressure').value);
     const sysType = sysTypeVal || document.getElementById('sysType').value;
-    const radius = parseFloat(radVal || document.getElementById('radius').value);
+    const radInputVal = parseFloat(radVal || document.getElementById('radius').value);
 
-    if (isNaN(lat) || isNaN(lng) || isNaN(wind) || isNaN(pressure) || isNaN(radius)) {
+    if (isNaN(lat) || isNaN(lng) || isNaN(windInputVal) || isNaN(pressure) || isNaN(radInputVal)) {
       alert('올바른 수치를 입력하세요.');
       return;
     }
 
-    pushState(); // 변경 전 상태 이력 추가
+    pushState();
 
-    const info = getSystemInfo(sysType, wind);
-    waypoints.push({ lat, lng, wind, pressure, sysType, radius, info });
+    const unit = document.getElementById('windUnit').value;
+    
+    // 내부 정규화 저장 (windKt: 노트, radiusKm: 킬로미터)
+    const windKt = unit === 'kt' ? windInputVal : windInputVal * 1.94384;
+    const radiusKm = unit === 'kt' ? radInputVal * 1.852 : radInputVal;
 
-    document.getElementById('radius').value = radius + 30;
+    const info = getSystemInfo(sysType, windKt);
+    waypoints.push({ lat, lng, windKt, pressure, sysType, radiusKm, info });
+
+    // 입력창에 오차반경 자동 증가 적용 (+30km 또는 +15NM)
+    const stepIncrease = unit === 'kt' ? 15 : 30;
+    document.getElementById('radius').value = radInputVal + stepIncrease;
+
     updateVisualization();
   }
 
@@ -299,14 +326,22 @@
 
     if (waypoints.length === 0) return;
 
+    const unit = document.getElementById('windUnit').value;
     const turfBuffers = [];
 
     waypoints.forEach((pt, idx) => {
+      // 선택된 단위에 맞춘 표시용 수치 계산
+      const displayWind = unit === 'kt' ? Math.round(pt.windKt) : Math.round(pt.windKt / 1.94384);
+      const windUnitText = unit === 'kt' ? 'kt' : 'm/s';
+      
+      const displayRadius = unit === 'kt' ? Math.round(pt.radiusKm * 0.539957) : Math.round(pt.radiusKm);
+      const radiusUnitText = unit === 'kt' ? 'NM' : 'km';
+
       const li = document.createElement('li');
       li.innerHTML = `
         <div>
           <b>#${idx + 1} (${pt.lat}, ${pt.lng})</b><br>
-          <span style="color:#64748b;">${pt.pressure}hPa / ${pt.wind}m/s / ${pt.radius}km</span>
+          <span style="color:#64748b;">${pt.pressure}hPa / ${displayWind}${windUnitText} / ${displayRadius}${radiusUnitText}</span>
         </div>
         <span class="sshs-badge" style="background-color: ${pt.info.color}; color: ${pt.info.textColor};">
           ${pt.info.name}
@@ -320,7 +355,7 @@
         weight: 1.5,
         fillColor: pt.info.color,
         fillOpacity: 1
-      }).bindPopup(`<b>#${idx + 1} ${pt.info.name}</b><br>기압: ${pt.pressure} hPa<br>풍속: ${pt.wind} m/s<br>오차반경: ${pt.radius} km`).addTo(markerLayer);
+      }).bindPopup(`<b>#${idx + 1} ${pt.info.name}</b><br>기압: ${pt.pressure} hPa<br>풍속: ${displayWind} ${windUnitText}<br>오차반경: ${displayRadius} ${radiusUnitText}`).addTo(markerLayer);
 
       if (idx > 0) {
         const prev = waypoints[idx - 1];
@@ -333,7 +368,7 @@
       }
 
       const pointGeoJSON = turf.point([pt.lng, pt.lat]);
-      const buffer = turf.buffer(pointGeoJSON, pt.radius, { units: 'kilometers' });
+      const buffer = turf.buffer(pointGeoJSON, pt.radiusKm, { units: 'kilometers' });
       turfBuffers.push(buffer);
     });
 
@@ -404,7 +439,9 @@
           pushState();
           waypoints = importedData.map(pt => ({
             ...pt,
-            info: getSystemInfo(pt.sysType || 'tropical', pt.wind)
+            windKt: pt.windKt !== undefined ? pt.windKt : (pt.wind || 0) * 1.94384,
+            radiusKm: pt.radiusKm !== undefined ? pt.radiusKm : (pt.radius || 50),
+            info: getSystemInfo(pt.sysType || 'tropical', pt.windKt !== undefined ? pt.windKt : (pt.wind || 0) * 1.94384)
           }));
           updateVisualization();
           alert('성공적으로 태풍 경로 데이터를 불러왔습니다.');
@@ -426,23 +463,25 @@
     waypoints = [];
     document.getElementById('lat').value = '20.0';
     document.getElementById('lng').value = '130.0';
-    document.getElementById('wind').value = '25';
+    
+    const unit = document.getElementById('windUnit').value;
+    document.getElementById('wind').value = unit === 'kt' ? '50' : '25';
     document.getElementById('pressure').value = '980';
-    document.getElementById('radius').value = '50';
+    document.getElementById('radius').value = unit === 'kt' ? '25' : '50';
     document.getElementById('sysType').value = 'tropical';
+    
     updateVisualization();
   }
 
-  // 키보드 단축키 이벤트 (Ctrl+Z / Ctrl+Y)
   window.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       if (e.shiftKey) {
-        redo(); // Ctrl+Shift+Z
+        redo();
       } else {
-        undo(); // Ctrl+Z
+        undo();
       }
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-      redo(); // Ctrl+Y
+      redo();
     }
   });
 </script>
