@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나무위키 연도별 태풍 템플릿 생성기</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; color: #1e293b; }
+        .wiki-mono { font-family: 'JetBrains Mono', monospace; }
+        .namu-folding-box {
+            border: 1px dashed #cbd5e1;
+            background-color: #f8fafc;
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .namu-folding-box:hover {
+            background-color: #f1f5f9;
+            color: #3594d3;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <header class="bg-[#3594d3] text-white shadow-md py-3 px-6 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div class="flex items-center gap-3">
+                <span class="bg-white text-[#3594d3] font-black px-2.5 py-1 rounded text-sm shadow">나무위키</span>
+                <h1 class="text-base font-bold">연도별 태풍 템플릿 생성기 (접기/펼치기 인터랙션 지원)</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="exportPreviewHTML()" class="bg-white text-[#3594d3] hover:bg-sky-50 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow flex items-center gap-1.5">
+                    💾 미리보기 HTML 내보내기
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[1700px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
+        
+        <!-- 왼쪽 패널: 설정 및 편집 -->
+        <section class="xl:col-span-6 bg-white rounded-xl shadow-lg border border-slate-200 p-5 flex flex-col gap-4 max-h-[88vh] overflow-y-auto">
+            <div class="flex flex-wrap justify-between items-center border-b pb-3 gap-2">
+                <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <span>⚙️</span> 기본 템플릿 환경 설정
+                </h2>
+                <div class="flex flex-wrap gap-1.5">
+                    <button onclick="loadSample2018()" class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1 rounded font-bold transition">2018년 샘플</button>
+                    <button onclick="loadSample2025()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded font-medium transition">2025년</button>
+                    <button onclick="loadSample2026()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded font-medium transition">2026년</button>
+                    <button onclick="resetData()" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1 rounded font-medium transition">초기화</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">대상 연도</label>
+                    <input type="number" id="cfg-year" value="2018" class="w-full border rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">연대/목록 앵커</label>
+                    <input type="text" id="cfg-decade-sec" value="태풍/목록" class="w-full border rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none" placeholder="태풍/목록 또는 s-8">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">이전 연도</label>
+                    <input type="number" id="cfg-prev-year" value="2017" class="w-full border rounded-lg p-2 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">다음 연도</label>
+                    <input type="number" id="cfg-next-year" value="2019" class="w-full border rounded-lg p-2 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- 하단 각주 커스텀 입력 -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2">
+                <label class="block text-xs font-bold text-slate-700">추가 하단 각주 문구 (선택사항)</label>
+                <input type="text" id="cfg-footer-note" value="H 허리케인이 날짜변경선을 넘어오면서 태풍으로 편입된 것으로 허리케인때의 이름이 붙어있다." class="w-full border rounded-lg p-1.5 text-xs text-slate-600 font-mono">
+            </div>
+
+            <!-- WMO 140개 범위 선택 도구 -->
+            <div class="bg-sky-50 border border-sky-200 rounded-xl p-3 flex flex-col gap-2">
+                <h3 class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                    <span>🌀</span> WMO 140개 공식 이름 범위로 일괄 생성 (순환 지원)
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">시작 태풍</label>
+                        <select id="range-start" class="w-full border rounded-lg p-1.5 text-xs bg-white font-medium"></select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">마지막 태풍</label>
+                        <select id="range-end" class="w-full border rounded-lg p-1.5 text-xs bg-white font-medium"></select>
+                    </div>
+                </div>
+                <button onclick="applyTyphoonRange()" class="mt-1 bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 rounded-lg text-xs transition shadow flex items-center justify-center gap-1.5">
+                    ✨ 선택한 범위로 태풍 목록 일괄 생성
+                </button>
+            </div>
+
+            <div class="flex justify-between items-center border-t pt-4">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <span>📋</span> 개별 태풍 항목 관리
+                    </h2>
+                    <p class="text-[11px] text-slate-500">각 태풍별 링크 세부 지정, 각주 기호 설정 가능</p>
+                </div>
+                <button onclick="addTyphoonAt(-1)" class="bg-[#3594d3] hover:bg-[#27658f] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow flex items-center gap-1">
+                    + 맨 하단에 태풍 추가
+                </button>
+            </div>
+
+            <div id="typhoon-editor-list" class="flex flex-col gap-2">
+                <!-- 동적 렌더링 -->
+            </div>
+        </section>
+
+        <!-- 오른쪽 패널: 미리보기 및 위키 소스 -->
+        <section class="xl:col-span-6 bg-white rounded-xl shadow-lg border border-slate-200 p-5 flex flex-col gap-4 max-h-[88vh]">
+            <div class="flex flex-col sm:flex-row justify-between items-center border-b pb-3 gap-2">
+                <div class="flex gap-2">
+                    <button onclick="switchTab('preview')" id="btn-tab-preview" class="px-4 py-2 text-xs font-bold rounded-lg bg-[#3594d3] text-white transition shadow">미리보기</button>
+                    <button onclick="switchTab('source')" id="btn-tab-source" class="px-4 py-2 text-xs font-bold rounded-lg bg-gray-100 text-slate-600 transition">나무위키 위키텍스트 소스</button>
+                </div>
+                <button onclick="copyWikiSource()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow flex items-center gap-1.5">
+                    📋 위키 소스 복사하기
+                </button>
+            </div>
+
+            <!-- 미리보기 패널 -->
+            <div id="panel-preview" class="flex-grow border border-slate-300 rounded-lg p-4 overflow-y-auto bg-slate-50 flex items-center justify-center">
+                <!-- 렌더링 영역 -->
+            </div>
+
+            <!-- 소스 코드 패널 -->
+            <div id="panel-source" class="hidden flex-grow flex flex-col">
+                <div class="bg-slate-900 rounded-lg p-3 flex-grow flex flex-col shadow-inner">
+                    <div class="text-slate-400 text-[11px] mb-2 font-mono flex justify-between items-center">
+                        <span>Namuwiki Exact Syntax Output</span>
+                        <span class="text-sky-400">UTF-8 Ready</span>
+                    </div>
+                    <textarea id="output-wikitext" readonly class="w-full h-[62vh] bg-slate-950 text-emerald-400 font-mono text-xs p-3 rounded border border-slate-800 focus:outline-none resize-none leading-relaxed"></textarea>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 토스트 메시지 -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl opacity-0 transition-opacity duration-300 pointer-events-none z-50 text-xs font-bold flex items-center gap-2 border border-slate-700">
+        <span class="text-sky-400">✨</span> <span id="toast-msg">복사되었습니다!</span>
+    </div>
+
+    <script>
+        const official140Names = [
+            "담레이", "톈마", "기러기", "윈욍", "고이누", "볼라벤", "산바", "즐라왓", "티로우", "말릭시",
+            "개미", "프라피룬", "마리아", "손띤", "암필", "우쿵", "종다리", "산산", "토모", "리피",
+            "버빙카", "풀라산", "솔릭", "시마론", "나래", "부라파", "바리자트", "호아반", "코키", "인싱",
+            "개구리", "딤섬", "헤비", "파북", "우딥", "스팟", "문", "다나스", "나리", "위파",
+            "프란시스코", "꼬마이", "크로사", "바이루", "버들", "링링", "가지키", "농파", "페이파", "타파",
+            "미탁", "라가사", "너구리", "부알로이", "마트모", "할롱", "나크리", "펑선", "갈매기", "풍웡",
+            "고토", "노카엔", "페냐", "누리", "실라코", "하구핏", "장미", "메칼라", "히고스", "바비",
+            "마이삭", "하이선", "노을", "돌핀", "구지라", "찬홈", "페이러우", "낭카", "사우델", "나라",
+            "개나리", "앗사니", "아타우", "방랑", "크로반", "두쥐안", "수리개", "초이완", "고구마", "참피",
+            "인파", "츰파카", "네파탁", "루핏", "미리내", "니다", "오마이스", "룩빈", "찬투", "뎬무", "민들레",
+            "라이언록", "도케이", "남테운", "말로", "냐토", "사르불", "아무야오", "고사리", "차바", "에어리",
+            "송다", "트라세", "무란", "메아리", "칭마", "도카게", "옹망", "무이파", "므르복", "난마돌",
+            "탈라스", "호두", "꿀랍", "로카", "선까", "네삿", "하이탕", "잠자리", "바냔", "야마네코",
+            "파카르", "상우", "마와르", "구촐", "탈림", "보리", "카눈", "란", "사오비엔"
+        ];
+
+        const colorOptions = [
+            { label: "열대요란 (LPA/LPD) - #80CCFF", value: "#80CCFF" },
+            { label: "열대요란 (LPA/LPD) 다크 - #3e627a", value: "#3e627a" },
+            { label: "아열대저기압 (SD) - #663CEA", value: "#663CEA" },
+            { label: "아열대저기압 (SD) 다크 - #402694", value: "#402694" },
+            { label: "아열대폭풍 (SS) - #8CED8C", value: "#8CED8C" },
+            { label: "아열대폭풍 (SS) 다크 - #569156", value: "#569156" },
+            { label: "JTWC 열대저기압 (TD) < 34kn - #5EBAFF", value: "#5EBAFF" },
+            { label: "JTWC 열대저기압 (TD) 다크 - #396E96", value: "#396E96" },
+            { label: "열대폭풍 (TS) 34~63kn / JMA 34~47kn - #00FAF4", value: "#00FAF4" },
+            { label: "열대폭풍 (TS) 다크 - #029693", value: "#029693" },
+            { label: "1등급 태풍 (Cat. 1) 64~82kn - #FFC / #FFFFCC", value: "#FFC" },
+            { label: "1등급 태풍 (Cat. 1) 다크 - #677A7A", value: "#677A7A" },
+            { label: "2등급 태풍 (Cat. 2) 83~95kn - #FFE775", value: "#FFE775" },
+            { label: "2등급 태풍 (Cat. 2) 다크 - #998B45", value: "#998B45" },
+            { label: "3등급 태풍 (Cat. 3) / JMA 매우 강한 태풍 96~112kn - #FFC140", value: "#FFC140" },
+            { label: "3등급 태풍 (Cat. 3) 다크 - #A37D2C", value: "#A37D2C" },
+            { label: "4등급 태풍 (Cat. 4) 113~136kn - #FF8F20", value: "#FF8F20" },
+            { label: "4등급 태풍 (Cat. 4) 다크 - #965514", value: "#965514" },
+            { label: "5등급 태풍 (Cat. 5) / JMA 맹렬한 태풍 ≥ 137kn - #FF6060", value: "#FF6060" },
+            { label: "5등급 태풍 (Cat. 5) 다크 - #943737", value: "#943737" },
+            { label: "JMA 강한 열대폭풍 (STS) 48~63kn - #CFF", value: "#CFF" },
+            { label: "JMA 강한 열대폭풍 (STS) 다크 - #7C9999", value: "#7C9999" },
+            { label: "JMA 강한 태풍 (TY) 64~84kn - #FDAF9A", value: "#FDAF9A" },
+            { label: "JMA 강한 태풍 (TY) 다크 - #A87567", value: "#A87567" },
+            { label: "기본 흰색 / 미발생용 - #fff", value: "#fff" }
+        ];
+
+        let typhoons = [];
+
+        window.onload = function() {
+            initRangeSelects();
+            loadSample2018();
+
+            ['cfg-year', 'cfg-decade-sec', 'cfg-prev-year', 'cfg-next-year', 'cfg-footer-note'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', generateWikiCode);
+            });
+        };
+
+        function initRangeSelects() {
+            const startSelect = document.getElementById('range-start');
+            const endSelect = document.getElementById('range-end');
+            if (!startSelect || !endSelect) return;
+            startSelect.innerHTML = '';
+            endSelect.innerHTML = '';
+
+            official140Names.forEach((name, idx) => {
+                const opt1 = document.createElement('option');
+                opt1.value = name;
+                opt1.text = `${idx + 1}. ${name}`;
+                startSelect.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = name;
+                opt2.text = `${idx + 1}. ${name}`;
+                endSelect.appendChild(opt2);
+            });
+
+            startSelect.value = "상우";
+            endSelect.value = "즐라왓";
+        }
+
+        function applyTyphoonRange() {
+            const startName = document.getElementById('range-start').value;
+            const endName = document.getElementById('range-end').value;
+            
+            const startIndex = official140Names.indexOf(startName);
+            const endIndex = official140Names.indexOf(endName);
+
+            if (startIndex === -1 || endIndex === -1) {
+                showToast("태풍 이름을 찾을 수 없습니다.");
+                return;
+            }
+
+            typhoons = [];
+            let currentIndex = startIndex;
+            let safetyCounter = 0;
+            
+            while (safetyCounter < 150) {
+                const name = official140Names[currentIndex];
+                typhoons.push({
+                    name: name,
+                    link: `${name}(태풍)#s-6`,
+                    bg: "#00FAF4",
+                    isBold: true,
+                    isAffected: false,
+                    isRetired: false,
+                    isUnissued: false,
+                    footnote: ""
+                });
+
+                if (currentIndex === endIndex) break;
+                
+                currentIndex = (currentIndex + 1) % official140Names.length;
+                safetyCounter++;
+            }
+
+            renderEditor();
+            generateWikiCode();
+            showToast(`총 ${typhoons.length}개의 태풍 목록이 생성되었습니다.`);
+        }
+
+        function loadSample2018() {
+            document.getElementById('cfg-year').value = "2018";
+            document.getElementById('cfg-decade-sec').value = "태풍/목록";
+            document.getElementById('cfg-prev-year').value = "2017";
+            document.getElementById('cfg-next-year').value = "2019";
+            document.getElementById('cfg-footer-note').value = "H 허리케인이 날짜변경선을 넘어오면서 태풍으로 편입된 것으로 허리케인때의 이름이 붙어있다.";
+            
+            typhoons = [
+                { name: "볼라벤", link: "볼라벤#s-5", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "산바", link: "산바#s-3", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "즐라왓", link: "즐라왓#s-5", bg: "#FF8F20", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
+            ];
+            renderEditor();
+            generateWikiCode();
+            showToast("2018년 태풍 샘플이 성공적으로 로드되었습니다.");
+        }
+
+        function loadSample2026() {
+            document.getElementById('cfg-year').value = "2026";
+            document.getElementById('cfg-decade-sec').value = "s-8";
+            document.getElementById('cfg-prev-year').value = "2025";
+            document.getElementById('cfg-next-year').value = "2027";
+            document.getElementById('cfg-footer-note').value = "";
+            typhoons = [
+                { name: "노카엔", link: "노카엔(태풍)#s-2", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "페냐", link: "페냐(태풍)#s-2", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
+            ];
+            renderEditor();
+            generateWikiCode();
+            showToast("2026년형 샘플이 로드되었습니다.");
+        }
+
+        function loadSample2025() {
+            document.getElementById('cfg-year').value = "2025";
+            document.getElementById('cfg-decade-sec').value = "s-7";
+            document.getElementById('cfg-prev-year').value = "2024";
+            document.getElementById('cfg-next-year').value = "2026";
+            document.getElementById('cfg-footer-note').value = "";
+            typhoons = [
+                { name: "우딥", link: "우딥(태풍)#s-6", bg: "#FFC", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "스팟", link: "스팟(태풍)#s-6", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
+            ];
+            renderEditor();
+            generateWikiCode();
+            showToast("2025년형 샘플이 로드되었습니다.");
+        }
+
+        function resetData() {
+            typhoons = [];
+            renderEditor();
+            generateWikiCode();
+            showToast("목록이 초기화되었습니다.");
+        }
+
+        function onNameInput(index, newName) {
+            typhoons[index].name = newName;
+            if (!typhoons[index].link || typhoons[index].link.includes("(태풍)")) {
+                typhoons[index].link = `${newName}(태풍)#s-6`;
+                const linkInput = document.getElementById(`link-input-${index}`);
+                if (linkInput) linkInput.value = typhoons[index].link;
+            }
+            generateWikiCode();
+        }
+
+        function renderEditor() {
+            const container = document.getElementById('typhoon-editor-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (typhoons.length === 0) {
+                container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-lg border border-dashed border-slate-300">등록된 태풍이 없습니다. [+ 맨 하단에 태풍 추가] 버튼을 누르거나 위에서 범위를 선택해주세요.</div>`;
+                return;
+            }
+
+            typhoons.forEach((t, index) => {
+                const insertBtnHTML = `
+                    <div class="flex items-center justify-center my-0.5">
+                        <button onclick="addTyphoonAt(${index})" class="w-full py-1 bg-sky-50 hover:bg-sky-100 text-sky-600 border border-dashed border-sky-300 rounded text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-xs">
+                            ➕ 이 위치에 태풍 추가 (위)
+                        </button>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', insertBtnHTML);
+
+                const card = document.createElement('div');
+                card.className = "bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col gap-2 shadow-sm text-xs";
+                
+                let colorOptionsHTML = '';
+                colorOptions.forEach(opt => {
+                    const selected = (t.bg === opt.value) ? 'selected' : '';
+                    colorOptionsHTML += `<option value="${opt.value}" ${selected}>${opt.label}</option>`;
+                });
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center border-b pb-1.5">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded">#${index + 1}</span>
+                            <input type="text" value="${t.name}" oninput="onNameInput(${index}, this.value)" placeholder="태풍 이름" class="border rounded px-2 py-1 font-bold w-28">
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="moveTyphoon(${index}, -1)" class="text-slate-600 hover:text-slate-900 px-1.5 py-0.5 bg-white border rounded">⬆️</button>
+                            <button onclick="moveTyphoon(${index}, 1)" class="text-slate-600 hover:text-slate-900 px-1.5 py-0.5 bg-white border rounded">⬇️</button>
+                            <button onclick="removeTyphoon(${index})" class="text-red-500 hover:text-red-700 font-bold px-2 py-0.5 bg-white border rounded">삭제</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-0.5">위키 링크</label>
+                            <input type="text" id="link-input-${index}" value="${t.link}" oninput="updateTyphoon(${index}, 'link', this.value)" class="w-full border rounded p-1 font-mono text-[11px]">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-0.5">각주 기호 (예: ^H^)</label>
+                            <input type="text" value="${t.footnote || ''}" oninput="updateTyphoon(${index}, 'footnote', this.value)" placeholder="없음" class="w-full border rounded p-1 font-mono text-[11px]">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 pt-1">
+                        <label class="text-[11px] text-slate-700 flex items-center gap-1 cursor-pointer font-medium">
+                            <input type="checkbox" ${t.isBold ? 'checked' : ''} onchange="updateTyphoon(${index}, 'isBold', this.checked)" class="rounded text-sky-600"> 굵게
+                        </label>
+                        <label class="text-[11px] text-slate-700 flex items-center gap-1 cursor-pointer font-medium">
+                            <input type="checkbox" ${t.isAffected ? 'checked' : ''} onchange="updateTyphoon(${index}, 'isAffected', this.checked)" class="rounded text-sky-600"> 한반도(*)
+                        </label>
+                        <label class="text-[11px] text-slate-700 flex items-center gap-1 cursor-pointer font-medium">
+                            <input type="checkbox" ${t.isRetired ? 'checked' : ''} onchange="updateTyphoon(${index}, 'isRetired', this.checked)" class="rounded text-sky-600"> 제명(__)
+                        </label>
+                        <label class="text-[11px] text-slate-700 flex items-center gap-1 cursor-pointer font-medium">
+                            <input type="checkbox" ${t.isUnissued ? 'checked' : ''} onchange="updateTyphoon(${index}, 'isUnissued', this.checked)" class="rounded text-sky-600"> 미발생(--)
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <span class="text-[10px] text-slate-500">배경 색상:</span>
+                        <select onchange="updateTyphoon(${index}, 'bg', this.value)" class="border rounded p-1 text-[11px] bg-white w-full sm:w-auto font-mono">
+                            ${colorOptionsHTML}
+                        </select>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function addTyphoonAt(index) {
+            const newName = `새태풍`;
+            const newItem = {
+                name: newName,
+                link: `${newName}(태풍)#s-6`,
+                bg: "#00FAF4",
+                isBold: true,
+                isAffected: false,
+                isRetired: false,
+                isUnissued: false,
+                footnote: ""
+            };
+
+            if (index === -1 || index >= typhoons.length) {
+                typhoons.push(newItem);
+            } else {
+                typhoons.splice(index, 0, newItem);
+            }
+            renderEditor();
+            generateWikiCode();
+        }
+
+        function removeTyphoon(index) {
+            typhoons.splice(index, 1);
+            renderEditor();
+            generateWikiCode();
+        }
+
+        function moveTyphoon(index, direction) {
+            const target = index + direction;
+            if (target < 0 || target >= typhoons.length) return;
+            const temp = typhoons[index];
+            typhoons[index] = typhoons[target];
+            typhoons[target] = temp;
+            renderEditor();
+            generateWikiCode();
+        }
+
+        function updateTyphoon(index, field, value) {
+            typhoons[index][field] = value;
+            generateWikiCode();
+        }
+
+        function generateWikiCode() {
+            const yearInput = document.getElementById('cfg-year');
+            const decadeSecInput = document.getElementById('cfg-decade-sec');
+            const prevYearInput = document.getElementById('cfg-prev-year');
+            const nextYearInput = document.getElementById('cfg-next-year');
+            const footerNoteInput = document.getElementById('cfg-footer-note');
+
+            const year = yearInput ? yearInput.value : "2018";
+            const decadeSec = decadeSecInput ? decadeSecInput.value : "태풍/목록";
+            const prevYear = prevYearInput ? prevYearInput.value : "2017";
+            const nextYear = nextYearInput ? nextYearInput.value : "2019";
+            const footerNote = footerNoteInput ? footerNoteInput.value : "";
+
+            let titleAnchor = decadeSec.startsWith("s-") ? `태풍/사례/2020년대#${decadeSec}` : decadeSec;
+
+            let wiki = `||<tablewidth=100%><tablebordercolor=#3594d3,#27658f><tablealign=center><tablebgcolor=#3594d3,#27658f> '''[[${titleAnchor}|{{{#ffffff,#ddd ${year}년 태풍}}}]]''' ||\n`;
+            wiki += `||<bgcolor=#ffffff,#191919><^|1><height=32> {{{#!wiki style="margin:0 -10px -5px"\n`;
+            wiki += `{{{#!folding [ 펼치기 · 접기 ]\n`;
+            wiki += `{{{#!wiki style="margin:-6px -1px -11px"\n`;
+            wiki += `||<tablewidth=100%>`;
+
+            let rowCount = 0;
+            typhoons.forEach((t) => {
+                if (rowCount > 0 && rowCount % 5 === 0) {
+                    wiki += `||\n||<tablewidth=100%>`;
+                }
+
+                let innerName = t.name;
+                if (t.isRetired) innerName = `__${innerName}__`;
+                if (t.isBold) innerName = `'''${innerName}'''`;
+                if (t.isUnissued) innerName = `--${t.name}--`;
+                
+                if (t.isAffected) {
+                    innerName += `*`;
+                }
+                if (t.footnote) {
+                    innerName += t.footnote;
+                }
+
+                let bgVal = t.bg;
+                if (t.isUnissued) bgVal = "#fff,#000";
+
+                let cellStyle = `<width=20%><bgcolor=${bgVal}>`;
+                if (t.name.length >= 4) {
+                    wiki += `${cellStyle} {{{#!wiki style="word-break: keep-all; margin: 0px -10px"\n[[${t.link}|{{{#000 ${innerName}}}]]}}} ||`;
+                } else {
+                    wiki += `${cellStyle} [[${t.link}|{{{#000 ${innerName}}}]] ||`;
+                }
+                rowCount++;
+            });
+
+            const remainder = rowCount % 5;
+            if (remainder !== 0) {
+                for (let i = 0; i < (5 - remainder); i++) {
+                    wiki += `<width=20%> ||`;
+                }
+            }
+            wiki += `\n`;
+
+            wiki += `||<rowbgcolor=#FFFFFF,#1c1d1f>,,[[틀:${prevYear}년 태풍|← ${prevYear}년 태풍]],, ||<-3> {{{-3 __밑줄__이 그어진 이름은 제명된 태풍이다. 한반도에 영향을 준 태풍은 이름 뒤에 * 표기.}}} || ,,[[틀:${nextYear}년 태풍|${nextYear}년 태풍 →]],,||\n`;
+            
+            if (footerNote.trim() !== "") {
+                wiki += `||<-5><bgcolor=#FFFFFF,#1c1d1f> {{{-3 ${footerNote}}} ||\n`;
+            }
+
+            wiki += `}}}}}}}}} ||`;
+
+            const outputWikitext = document.getElementById('output-wikitext');
+            if (outputWikitext) outputWikitext.value = wiki;
+            renderPreviewHTML(year, prevYear, nextYear, footerNote);
+        }
+
+        function renderPreviewHTML(year, prevYear, nextYear, footerNote) {
+            let html = `
+                <div class="w-full max-w-2xl bg-white border-2 border-[#3594d3] rounded shadow-md overflow-hidden">
+                    <div class="bg-[#3594d3] text-white text-center font-bold py-2 text-xs">
+                        <a href="#" class="text-white hover:underline">${year}년 태풍</a>
+                    </div>
+                    <div class="p-2">
+                        <div class="namu-folding-box" onclick="toggleFolding(this)">
+                            [ 펼치기 · 접기 ]
+                        </div>
+                        <div class="folding-content mt-2 border border-slate-200 rounded p-2 bg-slate-50">
+                            <div class="grid grid-cols-5 gap-1">
+            `;
+
+            typhoons.forEach(t => {
+                let displayName = t.name;
+                if (t.isRetired) displayName = `<span class="underline decoration-2">${displayName}</span>`;
+                if (t.isBold) displayName = `<b>${displayName}</b>`;
+                if (t.isUnissued) displayName = `<span class="line-through text-gray-400">${t.name}</span>`;
+                
+                if (t.isAffected) displayName += `*`;
+                if (t.footnote) displayName += `<sup class="text-xs text-sky-700">${t.footnote.replace(/\^/g, '')}</sup>`;
+
+                let bgHex = t.bg;
+                if (t.isUnissued) bgHex = "#ffffff";
+
+                html += `<div style="background-color: ${bgHex};" class="border border-slate-300 text-center py-1.5 px-1 text-[11px] rounded truncate" title="${t.name}">${displayName}</div>`;
+            });
+
+            html += `
+                            </div>
+                            <div class="mt-3 pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-500">
+                                <span>← ${prevYear}년 태풍</span>
+                                <span class="text-center font-medium"><u>제명</u> 제명 / 한반도 영향 (*)</span>
+                                <span>${nextYear}년 태풍 →</span>
+                            </div>
+            `;
+
+            if (footerNote.trim() !== "") {
+                html += `<div class="mt-1 pt-1 text-[9px] text-slate-400 border-t border-dashed">${footerNote}</div>`;
+            }
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const previewArea = document.getElementById('panel-preview');
+            if (previewArea) previewArea.innerHTML = html;
+        }
+
+        // 토글 함수 (접기/펼치기)
+        function toggleFolding(btn) {
+            const content = btn.nextElementSibling;
+            if (content.style.display === "none") {
+                content.style.display = "block";
+            } else {
+                content.style.display = "none";
+            }
+        }
+
+        function switchTab(tab) {
+            const btnPreview = document.getElementById('btn-tab-preview');
+            const btnSource = document.getElementById('btn-tab-source');
+            const panelPreview = document.getElementById('panel-preview');
+            const panelSource = document.getElementById('panel-source');
+
+            if (!btnPreview || !btnSource || !panelPreview || !panelSource) return;
+
+            if (tab === 'preview') {
+                panelPreview.classList.remove('hidden');
+                panelSource.classList.add('hidden');
+                btnPreview.className = "px-4 py-2 text-xs font-bold rounded-lg bg-[#3594d3] text-white transition shadow";
+                btnSource.className = "px-4 py-2 text-xs font-bold rounded-lg bg-gray-100 text-slate-600 transition";
+            } else {
+                panelPreview.classList.add('hidden');
+                panelSource.classList.remove('hidden');
+                btnSource.className = "px-4 py-2 text-xs font-bold rounded-lg bg-[#3594d3] text-white transition shadow";
+                btnPreview.className = "px-4 py-2 text-xs font-bold rounded-lg bg-gray-100 text-slate-600 transition";
+            }
+        }
+
+        function copyWikiSource() {
+            const textarea = document.getElementById('output-wikitext');
+            if (!textarea) return;
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast("나무위키 위키텍스트가 클립보드에 복사되었습니다!");
+            } catch (e) {
+                showToast("복사 실패. 브라우저 설정을 확인해주세요.");
+            }
+        }
+
+        function exportPreviewHTML() {
+            const previewContent = document.getElementById('panel-preview').innerHTML;
+            const yearVal = document.getElementById('cfg-year') ? document.getElementById('cfg-year').value : '2018';
+            
+            const standaloneHTML = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${yearVal}년 태풍 템플릿 미리보기</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; color: #1e293b; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .namu-folding-box { border: 1px dashed #cbd5e1; background-color: #f8fafc; padding: 8px; text-align: center; font-size: 12px; color: #64748b; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+        .namu-folding-box:hover { background-color: #f1f5f9; color: #3594d3; }
+    </style>
+</head>
+<body>
+    <div class="w-full max-w-2xl">
+        ${previewContent}
+    </div>
+    <script>
+        function toggleFolding(btn) {
+            const content = btn.nextElementSibling;
+            if (content.style.display === "none") {
+                content.style.display = "block";
+            } else {
+                content.style.display = "none";
+            }
+        }
+    <\/script>
+</body>
+</html>`;
+
+            const blob = new Blob([standaloneHTML], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `typhoon-template-${yearVal}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("미리보기 영역만 단독 HTML 파일로 내보내기 되었습니다!");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            if (!toast || !msgEl) return;
+            msgEl.innerText = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
