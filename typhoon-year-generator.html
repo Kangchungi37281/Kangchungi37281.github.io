@@ -60,6 +60,14 @@
                 </div>
             </div>
 
+            <!-- JSON 내보내기 / 가져오기 버튼 영역 추가 -->
+            <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 text-xs">
+                <span class="font-bold text-slate-700 pl-1">📁 데이터 관리:</span>
+                <button onclick="exportJSON()" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3 py-1 rounded font-bold transition shadow-xs">JSON 내보내기</button>
+                <button onclick="document.getElementById('import-json-file').click()" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3 py-1 rounded font-bold transition shadow-xs">JSON 가져오기</button>
+                <input type="file" id="import-json-file" accept=".json" class="hidden" onchange="importJSON(event)">
+            </div>
+
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">대상 연도</label>
@@ -331,6 +339,56 @@
             generateWikiCode();
             showToast("목록이 초기화되었습니다.");
         }
+
+        // --- JSON 내보내기 및 가져오기 기능 ---
+        function exportJSON() {
+            const data = {
+                year: document.getElementById('cfg-year').value,
+                decadeSec: document.getElementById('cfg-decade-sec').value,
+                prevYear: document.getElementById('cfg-prev-year').value,
+                nextYear: document.getElementById('cfg-next-year').value,
+                footerNote: document.getElementById('cfg-footer-note').value,
+                typhoons: typhoons
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `typhoon-template-${data.year}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("JSON 파일로 내보내기 되었습니다!");
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.year) document.getElementById('cfg-year').value = data.year;
+                    if (data.decadeSec) document.getElementById('cfg-decade-sec').value = data.decadeSec;
+                    if (data.prevYear) document.getElementById('cfg-prev-year').value = data.prevYear;
+                    if (data.nextYear) document.getElementById('cfg-next-year').value = data.nextYear;
+                    if (data.footerNote !== undefined) document.getElementById('cfg-footer-note').value = data.footerNote;
+                    if (Array.isArray(data.typhoons)) {
+                        typhoons = data.typhoons;
+                    }
+                    renderEditor();
+                    generateWikiCode();
+                    showToast("JSON 데이터를 성공적으로 불러왔습니다!");
+                } catch (err) {
+                    showToast("유효한 JSON 파일이 아닙니다.");
+                }
+                // 파일 input 초기화 (같은 파일 재선택 가능하도록)
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+        // -------------------------------------
 
         function onNameInput(index, newName) {
             typhoons[index].name = newName;
