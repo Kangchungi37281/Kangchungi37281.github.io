@@ -1,5 +1,8 @@
 # Kangchungi37281.github.io
 
+한국어 [영어](https://github.com/Kangchungi37281/Kangchungi37281.github.io/blob/main/Readme_en.md)
+
+
 웹 사이트에 오신 것을 환영합니다.
 이 사이트는 태풍,티니핑,마리오,모동숲 등을 다룰것입니다
 저는 태풍에 집중하기에 태풍 관련 도구가 많습니다
