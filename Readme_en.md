@@ -1,5 +1,7 @@
 # Kangchungi37281.github.io
-Caution! I am not good at English. 
+Caution! I am not good at English.
+
+[KO](https://github.com/Kangchungi37281/Kangchungi37281.github.io/blob/main/README.md) EN
 
 Welcome to the website.
 
