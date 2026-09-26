@@ -1,6 +1,6 @@
 # Kangchungi37281.github.io
 
-한국어 [영어](https://github.com/Kangchungi37281/Kangchungi37281.github.io/blob/main/Readme_en.md)
+ko [en](https://github.com/Kangchungi37281/Kangchungi37281.github.io/blob/main/Readme_en.md)
 
 
 웹 사이트에 오신 것을 환영합니다.
