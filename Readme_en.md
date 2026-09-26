@@ -1,5 +1,5 @@
 # Kangchungi37281.github.io
-Caution! I am not good at English.
+Caution! I am not good at English. The grammar might be incorrect because I don't know how to speak English. 
 
 [KO](https://github.com/Kangchungi37281/Kangchungi37281.github.io/blob/main/README.md) EN
 
