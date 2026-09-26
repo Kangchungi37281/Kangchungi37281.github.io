@@ -130,32 +130,17 @@
             </div>
         </section>
 
-        <!-- 오른쪽 패널: 미리보기 및 위키 소스 -->
+        <!-- 오른쪽 패널: 미리보기 -->
         <section class="xl:col-span-6 bg-white rounded-xl shadow-lg border border-slate-200 p-5 flex flex-col gap-4 max-h-[88vh]">
-            <div class="flex flex-col sm:flex-row justify-between items-center border-b pb-3 gap-2">
-                <div class="flex gap-2">
-                    <button onclick="switchTab('preview')" id="btn-tab-preview" class="px-4 py-2 text-xs font-bold rounded-lg bg-[#3594d3] text-white transition shadow">미리보기</button>
-                    <button onclick="switchTab('source')" id="btn-tab-source" class="px-4 py-2 text-xs font-bold rounded-lg bg-gray-100 text-slate-600 transition">나무위키 위키텍스트 소스(작동안함)</button>
-                </div>
-                <button onclick="copyWikiSource()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow flex items-center gap-1.5">
-                    📋 위키 소스 복사하기
-                </button>
+            <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <span>👁️</span> 템플릿 미리보기
+                </h2>
             </div>
 
             <!-- 미리보기 패널 -->
             <div id="panel-preview" class="flex-grow border border-slate-300 rounded-lg p-4 overflow-y-auto bg-slate-50 flex items-center justify-center">
                 <!-- 렌더링 영역 -->
-            </div>
-
-            <!-- 소스 코드 패널 -->
-            <div id="panel-source" class="hidden flex-grow flex flex-col">
-                <div class="bg-slate-900 rounded-lg p-3 flex-grow flex flex-col shadow-inner">
-                    <div class="text-slate-400 text-[11px] mb-2 font-mono flex justify-between items-center">
-                        <span>Namuwiki Exact Syntax Output</span>
-                        <span class="text-sky-400">UTF-8 Ready</span>
-                    </div>
-                    <textarea id="output-wikitext" readonly class="w-full h-[62vh] bg-slate-950 text-emerald-400 font-mono text-xs p-3 rounded border border-slate-800 focus:outline-none resize-none leading-relaxed"></textarea>
-                </div>
             </div>
         </section>
     </main>
@@ -328,7 +313,6 @@
             showToast("목록이 초기화되었습니다.");
         }
 
-        // --- JSON 내보내기 및 가져오기 기능 ---
         function exportJSON() {
             const data = {
                 year: document.getElementById('cfg-year').value,
@@ -371,12 +355,10 @@
                 } catch (err) {
                     showToast("유효한 JSON 파일이 아닙니다.");
                 }
-                // 파일 input 초기화 (같은 파일 재선택 가능하도록)
                 event.target.value = '';
             };
             reader.readAsText(file);
         }
-        // -------------------------------------
 
         function onNameInput(index, newName) {
             typhoons[index].name = newName;
@@ -509,73 +491,15 @@
 
         function generateWikiCode() {
             const yearInput = document.getElementById('cfg-year');
-            const decadeSecInput = document.getElementById('cfg-decade-sec');
             const prevYearInput = document.getElementById('cfg-prev-year');
             const nextYearInput = document.getElementById('cfg-next-year');
             const footerNoteInput = document.getElementById('cfg-footer-note');
 
             const year = yearInput ? yearInput.value : "2018";
-            const decadeSec = decadeSecInput ? decadeSecInput.value : "태풍/목록";
             const prevYear = prevYearInput ? prevYearInput.value : "2017";
             const nextYear = nextYearInput ? nextYearInput.value : "2019";
             const footerNote = footerNoteInput ? footerNoteInput.value : "";
 
-            let titleAnchor = decadeSec.startsWith("s-") ? `태풍/사례/2020년대#${decadeSec}` : decadeSec;
-
-            let wiki = `||<tablewidth=100%><tablebordercolor=#3594d3,#27658f><tablealign=center><tablebgcolor=#3594d3,#27658f> '''[[${titleAnchor}|{{{#ffffff,#ddd ${year}년 태풍}}}]]''' ||\n`;
-            wiki += `||<bgcolor=#ffffff,#191919><^|1><height=32> {{{#!wiki style="margin:0 -10px -5px"\n`;
-            wiki += `{{{#!folding [ 펼치기 · 접기 ]\n`;
-            wiki += `{{{#!wiki style="margin:-6px -1px -11px"\n`;
-            wiki += `||<tablewidth=100%>`;
-
-            let rowCount = 0;
-            typhoons.forEach((t) => {
-                if (rowCount > 0 && rowCount % 5 === 0) {
-                    wiki += `||\n||<tablewidth=100%>`;
-                }
-
-                let innerName = t.name;
-                if (t.isRetired) innerName = `__${innerName}__`;
-                if (t.isBold) innerName = `'''${innerName}'''`;
-                if (t.isUnissued) innerName = `--${t.name}--`;
-                
-                if (t.isAffected) {
-                    innerName += `*`;
-                }
-                if (t.footnote) {
-                    innerName += t.footnote;
-                }
-
-                let bgVal = t.bg;
-                if (t.isUnissued) bgVal = "#fff,#000";
-
-                let cellStyle = `<width=20%><bgcolor=${bgVal}>`;
-                if (t.name.length >= 4) {
-                    wiki += `${cellStyle} {{{#!wiki style="word-break: keep-all; margin: 0px -10px"\n[[${t.link}|{{{#000 ${innerName}}}]]}}} ||`;
-                } else {
-                    wiki += `${cellStyle} [[${t.link}|{{{#000 ${innerName}}}]] ||`;
-                }
-                rowCount++;
-            });
-
-            const remainder = rowCount % 5;
-            if (remainder !== 0) {
-                for (let i = 0; i < (5 - remainder); i++) {
-                    wiki += `<width=20%> ||`;
-                }
-            }
-            wiki += `\n`;
-
-            wiki += `||<rowbgcolor=#FFFFFF,#1c1d1f>,,[[틀:${prevYear}년 태풍|← ${prevYear}년 태풍]],, ||<-3> {{{-3 __밑줄__이 그어진 이름은 제명된 태풍이다. 한반도에 영향을 준 태풍은 이름 뒤에 * 표기.}}} || ,,[[틀:${nextYear}년 태풍|${nextYear}년 태풍 →]],,||\n`;
-            
-            if (footerNote.trim() !== "") {
-                wiki += `||<-5><bgcolor=#FFFFFF,#1c1d1f> {{{-3 ${footerNote}}} ||\n`;
-            }
-
-            wiki += `}}}}}}}}} ||`;
-
-            const outputWikitext = document.getElementById('output-wikitext');
-            if (outputWikitext) outputWikitext.value = wiki;
             renderPreviewHTML(year, prevYear, nextYear, footerNote);
         }
 
@@ -638,39 +562,6 @@
                 content.style.display = "block";
             } else {
                 content.style.display = "none";
-            }
-        }
-
-        function switchTab(tab) {
-            const btnPreview = document.getElementById('btn-tab-preview');
-            const btnSource = document.getElementById('btn-tab-source');
-            const panelPreview = document.getElementById('panel-preview');
-            const panelSource = document.getElementById('panel-source');
-
-            if (!btnPreview || !btnSource || !panelPreview || !panelSource) return;
-
-            if (tab === 'preview') {
-                panelPreview.classList.remove('hidden');
-                panelSource.classList.add('hidden');
-                btnPreview.className = "px-4 py-2 text-xs font-bold rounded-lg bg-[#3594d3] text-white transition shadow";
-                btnSource.className = "px-4 py-2 text-xs font-bold rounded-lg bg-gray-100 text-slate-600 transition";
-            } else {
-                panelPreview.classList.add('hidden');
-                panelSource.classList.remove('hidden');
-                btnSource.className = "px-4 py-2 text-xs font-bold rounded-lg bg-[#3594d3] text-white transition shadow";
-                btnPreview.className = "px-4 py-2 text-xs font-bold rounded-lg bg-gray-100 text-slate-600 transition";
-            }
-        }
-
-        function copyWikiSource() {
-            const textarea = document.getElementById('output-wikitext');
-            if (!textarea) return;
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                showToast("나무위키 위키텍스트가 클립보드에 복사되었습니다!");
-            } catch (e) {
-                showToast("복사 실패. 브라우저 설정을 확인해주세요.");
             }
         }
 
