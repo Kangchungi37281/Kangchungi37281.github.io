@@ -184,6 +184,14 @@
             { label: "기본 흰색 / 미발생용 - #fff", value: "#fff" }
         ];
 
+        const textColorOptions = [
+            { label: "기본값 (상속)", value: "" },
+            { label: "검은색 (#000000)", value: "#000000" },
+            { label: "하얀색 (#FFFFFF)", value: "#FFFFFF" },
+            { label: "진한 회색 (#333333)", value: "#333333" },
+            { label: "빨간색 (#FF0000)", value: "#FF0000" }
+        ];
+
         let typhoons = [];
 
         window.onload = function() {
@@ -241,6 +249,7 @@
                     name: name,
                     link: `${name}(태풍)#s-6`,
                     bg: "#00FAF4",
+                    textColor: "",
                     isBold: true,
                     isAffected: false,
                     isRetired: false,
@@ -267,9 +276,9 @@
             document.getElementById('cfg-footer-note').value = "H 허리케인이 날짜변경선을 넘어오면서 태풍으로 편입된 것으로 허리케인때의 이름이 붙어있다.";
             
             typhoons = [
-                { name: "볼라벤", link: "볼라벤#s-5", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "산바", link: "산바#s-3", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "즐라왓", link: "즐라왓#s-5", bg: "#FF8F20", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
+                { name: "볼라벤", link: "볼라벤#s-5", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "산바", link: "산바#s-3", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "즐라왓", link: "즐라왓#s-5", bg: "#FF8F20", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
             ];
             renderEditor();
             generateWikiCode();
@@ -283,8 +292,8 @@
             document.getElementById('cfg-next-year').value = "2027";
             document.getElementById('cfg-footer-note').value = "";
             typhoons = [
-                { name: "노카엔", link: "노카엔(태풍)#s-2", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "페냐", link: "페냐(태풍)#s-2", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
+                { name: "노카엔", link: "노카엔(태풍)#s-2", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "페냐", link: "페냐(태풍)#s-2", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
             ];
             renderEditor();
             generateWikiCode();
@@ -298,8 +307,8 @@
             document.getElementById('cfg-next-year').value = "2026";
             document.getElementById('cfg-footer-note').value = "";
             typhoons = [
-                { name: "우딥", link: "우딥(태풍)#s-6", bg: "#FFC", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "스팟", link: "스팟(태풍)#s-6", bg: "#00FAF4", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
+                { name: "우딥", link: "우딥(태풍)#s-6", bg: "#FFC", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
+                { name: "스팟", link: "스팟(태풍)#s-6", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
             ];
             renderEditor();
             generateWikiCode();
@@ -399,6 +408,12 @@
                     colorOptionsHTML += `<option value="${opt.value}" ${selected}>${opt.label}</option>`;
                 });
 
+                let textColorOptionsHTML = '';
+                textColorOptions.forEach(opt => {
+                    const selected = (t.textColor === opt.value) ? 'selected' : '';
+                    textColorOptionsHTML += `<option value="${opt.value}" ${selected}>${opt.label}</option>`;
+                });
+
                 card.innerHTML = `
                     <div class="flex justify-between items-center border-b pb-1.5">
                         <div class="flex items-center gap-2">
@@ -435,11 +450,19 @@
                             <input type="checkbox" ${t.isUnissued ? 'checked' : ''} onchange="updateTyphoon(${index}, 'isUnissued', this.checked)" class="rounded text-sky-600"> 미발생(--)
                         </label>
                     </div>
-                    <div class="flex items-center gap-2 pt-1">
-                        <span class="text-[10px] text-slate-500">배경 색상:</span>
-                        <select onchange="updateTyphoon(${index}, 'bg', this.value)" class="border rounded p-1 text-[11px] bg-white w-full sm:w-auto font-mono">
-                            ${colorOptionsHTML}
-                        </select>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-500 whitespace-nowrap">배경 색상:</span>
+                            <select onchange="updateTyphoon(${index}, 'bg', this.value)" class="border rounded p-1 text-[11px] bg-white w-full font-mono">
+                                ${colorOptionsHTML}
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-500 whitespace-nowrap">글자 색상:</span>
+                            <select onchange="updateTyphoon(${index}, 'textColor', this.value)" class="border rounded p-1 text-[11px] bg-white w-full font-mono">
+                                ${textColorOptionsHTML}
+                            </select>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
@@ -452,6 +475,7 @@
                 name: newName,
                 link: `${newName}(태풍)#s-6`,
                 bg: "#00FAF4",
+                textColor: "",
                 isBold: true,
                 isAffected: false,
                 isRetired: false,
@@ -529,7 +553,12 @@
                 let bgHex = t.bg;
                 if (t.isUnissued) bgHex = "#ffffff";
 
-                html += `<div style="background-color: ${bgHex};" class="border border-slate-300 text-center py-1.5 px-1 text-[11px] rounded truncate" title="${t.name}">${displayName}</div>`;
+                let styleAttr = `background-color: ${bgHex};`;
+                if (t.textColor && t.textColor.trim() !== "") {
+                    styleAttr += ` color: ${t.textColor};`;
+                }
+
+                html += `<div style="${styleAttr}" class="border border-slate-300 text-center py-1.5 px-1 text-[11px] rounded truncate" title="${t.name}">${displayName}</div>`;
             });
 
             html += `
