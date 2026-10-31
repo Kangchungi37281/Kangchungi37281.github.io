@@ -53,9 +53,6 @@
                     <span>⚙️</span> 기본 템플릿 환경 설정
                 </h2>
                 <div class="flex flex-wrap gap-1.5">
-                    <button onclick="loadSample2018()" class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1 rounded font-bold transition">2018년 샘플</button>
-                    <button onclick="loadSample2025()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded font-medium transition">2025년</button>
-                    <button onclick="loadSample2026()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded font-medium transition">2026년</button>
                     <button onclick="resetData()" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1 rounded font-medium transition">초기화</button>
                 </div>
             </div>
@@ -71,7 +68,7 @@
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">대상 연도</label>
-                    <input type="number" id="cfg-year" value="2018" class="w-full border rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <input type="number" id="cfg-year" value="2026" class="w-full border rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">연대/목록 앵커</label>
@@ -79,18 +76,18 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">이전 연도</label>
-                    <input type="number" id="cfg-prev-year" value="2017" class="w-full border rounded-lg p-2 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <input type="number" id="cfg-prev-year" value="2025" class="w-full border rounded-lg p-2 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">다음 연도</label>
-                    <input type="number" id="cfg-next-year" value="2019" class="w-full border rounded-lg p-2 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <input type="number" id="cfg-next-year" value="2027" class="w-full border rounded-lg p-2 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none">
                 </div>
             </div>
 
             <!-- 하단 각주 커스텀 입력 -->
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2">
                 <label class="block text-xs font-bold text-slate-700">추가 하단 각주 문구 (선택사항)</label>
-                <input type="text" id="cfg-footer-note" value="H 허리케인이 날짜변경선을 넘어오면서 태풍으로 편입된 것으로 허리케인때의 이름이 붙어있다." class="w-full border rounded-lg p-1.5 text-xs text-slate-600 font-mono">
+                <input type="text" id="cfg-footer-note" value="" class="w-full border rounded-lg p-1.5 text-xs text-slate-600 font-mono">
             </div>
 
             <!-- WMO 140개 범위 선택 도구 -->
@@ -196,7 +193,7 @@
 
         window.onload = function() {
             initRangeSelects();
-            loadSample2018();
+            resetData(); // 초기화 상태로 로드
 
             ['cfg-year', 'cfg-decade-sec', 'cfg-prev-year', 'cfg-next-year', 'cfg-footer-note'].forEach(id => {
                 const el = document.getElementById(id);
@@ -266,53 +263,6 @@
             renderEditor();
             generateWikiCode();
             showToast(`총 ${typhoons.length}개의 태풍 목록이 생성되었습니다.`);
-        }
-
-        function loadSample2018() {
-            document.getElementById('cfg-year').value = "2018";
-            document.getElementById('cfg-decade-sec').value = "태풍/목록";
-            document.getElementById('cfg-prev-year').value = "2017";
-            document.getElementById('cfg-next-year').value = "2019";
-            document.getElementById('cfg-footer-note').value = "H 허리케인이 날짜변경선을 넘어오면서 태풍으로 편입된 것으로 허리케인때의 이름이 붙어있다.";
-            
-            typhoons = [
-                { name: "볼라벤", link: "볼라벤#s-5", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "산바", link: "산바#s-3", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "즐라왓", link: "즐라왓#s-5", bg: "#FF8F20", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
-            ];
-            renderEditor();
-            generateWikiCode();
-            showToast("2018년 태풍 샘플이 성공적으로 로드되었습니다.");
-        }
-
-        function loadSample2026() {
-            document.getElementById('cfg-year').value = "2026";
-            document.getElementById('cfg-decade-sec').value = "s-8";
-            document.getElementById('cfg-prev-year').value = "2025";
-            document.getElementById('cfg-next-year').value = "2027";
-            document.getElementById('cfg-footer-note').value = "";
-            typhoons = [
-                { name: "노카엔", link: "노카엔(태풍)#s-2", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "페냐", link: "페냐(태풍)#s-2", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
-            ];
-            renderEditor();
-            generateWikiCode();
-            showToast("2026년형 샘플이 로드되었습니다.");
-        }
-
-        function loadSample2025() {
-            document.getElementById('cfg-year').value = "2025";
-            document.getElementById('cfg-decade-sec').value = "s-7";
-            document.getElementById('cfg-prev-year').value = "2024";
-            document.getElementById('cfg-next-year').value = "2026";
-            document.getElementById('cfg-footer-note').value = "";
-            typhoons = [
-                { name: "우딥", link: "우딥(태풍)#s-6", bg: "#FFC", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" },
-                { name: "스팟", link: "스팟(태풍)#s-6", bg: "#00FAF4", textColor: "", isBold: true, isAffected: false, isRetired: false, isUnissued: false, footnote: "" }
-            ];
-            renderEditor();
-            generateWikiCode();
-            showToast("2025년형 샘플이 로드되었습니다.");
         }
 
         function resetData() {
@@ -519,9 +469,9 @@
             const nextYearInput = document.getElementById('cfg-next-year');
             const footerNoteInput = document.getElementById('cfg-footer-note');
 
-            const year = yearInput ? yearInput.value : "2018";
-            const prevYear = prevYearInput ? prevYearInput.value : "2017";
-            const nextYear = nextYearInput ? nextYearInput.value : "2019";
+            const year = yearInput ? yearInput.value : "2026";
+            const prevYear = prevYearInput ? prevYearInput.value : "2025";
+            const nextYear = nextYearInput ? nextYearInput.value : "2027";
             const footerNote = footerNoteInput ? footerNoteInput.value : "";
 
             renderPreviewHTML(year, prevYear, nextYear, footerNote);
@@ -596,7 +546,7 @@
 
         function exportPreviewHTML() {
             const previewContent = document.getElementById('panel-preview').innerHTML;
-            const yearVal = document.getElementById('cfg-year') ? document.getElementById('cfg-year').value : '2018';
+            const yearVal = document.getElementById('cfg-year') ? document.getElementById('cfg-year').value : '2026';
             
             const standaloneHTML = `<!DOCTYPE html>
 <html lang="ko">
