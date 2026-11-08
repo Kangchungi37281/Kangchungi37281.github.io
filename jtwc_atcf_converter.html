@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATCF 형식 변환 도구</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #eaeaea;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 15px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        .option-group {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .option-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .option-group label {
+            margin-bottom: 0;
+            cursor: pointer;
+            font-weight: 500;
+            color: #333;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result-box {
+            margin-top: 25px;
+            background-color: #e9ecef;
+            padding: 20px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .result-text {
+            width: 100%;
+            background-color: #ffffff;
+            border: 1px solid #ced4da;
+            padding: 14px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 15px;
+            box-sizing: border-box;
+            word-break: break-all;
+            white-space: pre-wrap;
+            color: #212529;
+            margin-top: 10px;
+            min-height: 120px;
+        }
+        .description {
+            font-size: 13px;
+            color: #666;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>JTWC ATCF 형식 변환 도구</h2>
+    
+    <div class="form-group">
+        <label for="inputData">변환할 원본 ATCF 데이터를 입력해주세요 (여러 줄 입력 가능):</label>
+        <textarea id="inputData" placeholder="여기에 ATCF 데이터를 붙여넣어 주세요..."></textarea>
+        <div class="description">쉼표(,)로 구분된 기존 ATCF 레코드 형식을 입력해 주세요.</div>
+    </div>
+
+    <!-- 3시간 -> 6시간 간격 변경 옵션 (기본 꺼짐) -->
+    <div class="option-group">
+        <input type="checkbox" id="intervalToggle">
+        <label for="intervalToggle">시간 간격을 3시간에서 6시간 간격으로 변경하기 (00, 06, 12, 18시만 남기고 나머지 시간 제거)</label>
+    </div>
+
+    <button onclick="convertAtcf()">변환하기</button>
+
+    <div class="result-box">
+        <label for="outputResult">변환된 JTWC ATCF 형식 결과입니다:</label>
+        <div id="outputResult" class="result-text">변환 결과가 여기에 표시됩니다.</div>
+    </div>
+</div>
+
+<script>
+    function convertAtcf() {
+        try {
+            const rawInput = document.getElementById('inputData').value;
+            const is6HourInterval = document.getElementById('intervalToggle').checked;
+
+            if (!rawInput.trim()) {
+                alert('변환하실 데이터를 먼저 입력해 주세요!');
+                return;
+            }
+
+            let lines = rawInput.split('\n');
+            let processedLines = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line) continue;
+
+                let parts = line.split(',').map(item => item.trim());
+
+                if (parts.length < 11) {
+                    continue;
+                }
+
+                if (is6HourInterval) {
+                    let dtg = parts[2];
+                    if (dtg.length >= 10) {
+                        let hourStr = dtg.substring(dtg.length - 2);
+                        let hour = parseInt(hourStr, 10);
+
+                        if (hour !== 0 && hour !== 6 && hour !== 12 && hour !== 18) {
+                            continue; 
+                        }
+                    }
+                }
+
+                parts[3] = "03";       
+                parts[4] = "JTWC";     
+                parts[5] = "000";      
+
+                processedLines.push(parts.join(', '));
+            }
+
+            if (processedLines.length > 0) {
+                document.getElementById('outputResult').innerText = processedLines.join('\n');
+            } else {
+                document.getElementById('outputResult').innerText = "조건에 맞는 데이터가 없습니다. (모든 행이 제거되었거나 형식을 확인해주세요)";
+            }
+        } catch (error) {
+            alert("변환 중 오류가 발생했습니다: " + error.message);
+        }
+    }
+</script>
+
+</body>
+</html>
+
