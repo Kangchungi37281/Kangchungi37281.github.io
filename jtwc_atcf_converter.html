@@ -69,6 +69,10 @@
             font-weight: 500;
             color: #333;
         }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
         button {
             background-color: #007bff;
             color: white;
@@ -83,12 +87,27 @@
         button:hover {
             background-color: #0056b3;
         }
+        .btn-copy {
+            background-color: #28a745;
+        }
+        .btn-copy:hover {
+            background-color: #218838;
+        }
         .result-box {
             margin-top: 25px;
             background-color: #e9ecef;
             padding: 20px;
             border-radius: 4px;
             border-left: 4px solid #007bff;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .result-header label {
+            margin-bottom: 0;
         }
         .result-text {
             width: 100%;
@@ -102,7 +121,6 @@
             word-break: break-all;
             white-space: pre-wrap;
             color: #212529;
-            margin-top: 10px;
             min-height: 120px;
         }
         .description {
@@ -123,16 +141,20 @@
         <div class="description">쉼표(,)로 구분된 기존 ATCF 레코드 형식을 입력해 주세요.</div>
     </div>
 
-    <!-- 3시간 -> 6시간 간격 변경 옵션 (기본 꺼짐) -->
     <div class="option-group">
         <input type="checkbox" id="intervalToggle">
         <label for="intervalToggle">시간 간격을 3시간에서 6시간 간격으로 변경하기 (00, 06, 12, 18시만 남기고 나머지 시간 제거)</label>
     </div>
 
-    <button onclick="convertAtcf()">변환하기</button>
+    <div class="button-group">
+        <button onclick="convertAtcf()">변환하기</button>
+    </div>
 
     <div class="result-box">
-        <label for="outputResult">변환된 JTWC ATCF 형식 결과입니다:</label>
+        <div class="result-header">
+            <label for="outputResult">변환된 JTWC ATCF 형식 결과입니다:</label>
+            <button class="btn-copy" onclick="copyResult()">결과 복사하기</button>
+        </div>
         <div id="outputResult" class="result-text">변환 결과가 여기에 표시됩니다.</div>
     </div>
 </div>
@@ -189,8 +211,28 @@
             alert("변환 중 오류가 발생했습니다: " + error.message);
         }
     }
+
+    function copyResult() {
+        const resultText = document.getElementById('outputResult').innerText;
+        
+        if (!resultText || resultText === "변환 결과가 여기에 표시됩니다." || resultText.startsWith("조건에 맞는")) {
+            alert('복사할 변환 결과가 없습니다!');
+            return;
+        }
+
+        // 보안 제약 없이 안정적으로 동작하는 구형/범용 클립보드 복사 방식 적용
+        const textarea = document.createElement('textarea');
+        textarea.value = resultText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+        } catch (err) {
+            alert('복사에 실패했습니다.');
+        }
+        document.body.removeChild(textarea);
+    }
 </script>
 
 </body>
 </html>
-
