@@ -479,10 +479,10 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "track.atcf";
+      a.download = "track.txt";
       a.click();
       URL.revokeObjectURL(url);
-      setStatus("track.atcf 파일을 다운로드했다.", "ok");
+      setStatus("track.txt 파일을 다운로드했다.", "ok");
     });
   </script>
 </body>
