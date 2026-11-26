@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JSON to ATCF Converter (Strict - Fixed TAU 00 & DTG Step)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #0b1120;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --danger: #f87171;
+      --ok: #4ade80;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.35rem;
+      letter-spacing: 0.02em;
+    }
+
+    .sub {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .config-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .field input {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      background: var(--accent);
+      color: #062033;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .pane {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .pane-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 400px;
+      resize: vertical;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      font-size: 0.88rem;
+      white-space: pre-wrap;
+    }
+
+    .status.error {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .status.ok {
+      border-color: var(--ok);
+      color: var(--ok);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>JSON → ATCF STRICT CONVERTER</h1>
+    <p class="sub">TAU는 00 고정이다. TAU STEP (시간 간격)은 FALLBACK DTG (YYYYMMDDHH)의 시간을 증가시킨다.</p>
+
+    <div class="config-bar">
+      <div class="field">
+        <label for="basin">BASIN</label>
+        <input id="basin" type="text" value="WP" maxlength="2" />
+      </div>
+      <div class="field">
+        <label for="stormNum">STORM NUM (2자리)</label>
+        <input id="stormNum" type="text" value="04" maxlength="2" />
+      </div>
+      <div class="field">
+        <label for="defaultDtg">FALLBACK DTG (YYYYMMDDHH)</label>
+        <input id="defaultDtg" type="text" value="2026070100" maxlength="10" />
+      </div>
+      <div class="field">
+        <label for="tauStep">TAU STEP (시간 간격)</label>
+        <input id="tauStep" type="number" value="3" min="0" max="168" />
+      </div>
+      <div class="field">
+        <label for="tech">TECH</label>
+        <input id="tech" type="text" value="JTWC" maxlength="4" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="convertBtn" type="button">변환 실행</button>
+      <button id="copyAtcfBtn" class="secondary" type="button">ATCF 복사</button>
+      <button id="downloadAtcfBtn" class="secondary" type="button">ATCF 다운로드</button>
+      <button id="clearJsonBtn" class="secondary" type="button">JSON 비우기</button>
+      <button id="clearAtcfBtn" class="secondary" type="button">ATCF 비우기</button>
+    </div>
+
+    <div class="grid">
+      <div class="pane">
+        <div class="pane-header">
+          <span>JSON INPUT</span>
+          <span>시작 시 빈 상태 유지</span>
+        </div>
+        <textarea id="jsonInput" spellcheck="false" placeholder=""></textarea>
+      </div>
+
+      <div class="pane">
+        <div class="pane-header">
+          <span>ATCF INPUT / OUTPUT</span>
+          <span>시작 시 빈 상태 유지 / TAU 00 고정</span>
+        </div>
+        <textarea id="atcfBox" spellcheck="false" placeholder=""></textarea>
+      </div>
+    </div>
+
+    <div id="statusBox" class="status">대기 중: JSON을 입력한 뒤 변환 실행을 누르라.</div>
+  </div>
+
+  <script>
+    const FIXED_TAU = "00";
+    const jsonInput = document.getElementById("jsonInput");
+    const atcfBox = document.getElementById("atcfBox");
+    const statusBox = document.getElementById("statusBox");
+
+    // 엄격 규격: JSON 입력창과 ATCF 입력창 모두 반드시 비운 상태로 시작
+    jsonInput.value = "";
+    atcfBox.value = "";
+
+    const ALLOWED_STAGES = new Set([
+      "tropical cyclone",
+      "extratropical cyclone",
+      "subtropical cyclone"
+    ]);
+
+    function setStatus(msg, type = "") {
+      statusBox.textContent = msg;
+      statusBox.className = "status" + (type ? ` ${type}` : "");
+    }
+
+    function parseDtgToUtcDate(dtg10) {
+      if (!/^\d{10}$/.test(dtg10)) {
+        throw new Error("DTG는 10자리 숫자(YYYYMMDDHH)여야 한다.");
+      }
+      const year = Number(dtg10.slice(0, 4));
+      const month = Number(dtg10.slice(4, 6));
+      const day = Number(dtg10.slice(6, 8));
+      const hour = Number(dtg10.slice(8, 10));
+
+      if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23) {
+        throw new Error(`유효하지 않은 날짜/시간 값이다: "${dtg10}"`);
+      }
+
+      const dt = new Date(Date.UTC(year, month - 1, day, hour, 0, 0));
+      if (
+        dt.getUTCFullYear() !== year ||
+        dt.getUTCMonth() !== month - 1 ||
+        dt.getUTCDate() !== day ||
+        dt.getUTCHours() !== hour
+      ) {
+        throw new Error(`존재하지 않는 달력 날짜이다: "${dtg10}"`);
+      }
+      return dt;
+    }
+
+    function formatUtcDateToDtg(dt) {
+      const y = String(dt.getUTCFullYear()).padStart(4, "0");
+      const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(dt.getUTCDate()).padStart(2, "0");
+      const h = String(dt.getUTCHours()).padStart(2, "0");
+      return `${y}${m}${d}${h}`;
+    }
+
+    function addHoursToDtg(dtg10, hoursToAdd) {
+      const baseDate = parseDtgToUtcDate(dtg10);
+      const nextDate = new Date(baseDate.getTime() + hoursToAdd * 3600 * 1000);
+      return formatUtcDateToDtg(nextDate);
+    }
+
+    function normalizeCoord(raw, expectedHemis) {
+      if (typeof raw !== "string") {
+        throw new Error(`좌표는 문자열이어야 한다: ${String(raw)}`);
+      }
+      const trimmed = raw.trim().toUpperCase();
+      const match = trimmed.match(/^(\d+(?:\.\d+)?)([NSEW])$/);
+      if (!match) {
+        throw new Error(`좌표 형식이 잘못되었다: "${raw}"`);
+      }
+      const val = Number(match[1]);
+      const hemi = match[2];
+      if (!Number.isFinite(val)) {
+        throw new Error(`좌표 숫자가 유효하지 않다: "${raw}"`);
+      }
+      if (!expectedHemis.includes(hemi)) {
+        throw new Error(`반구(${hemi})가 허용 범위를 벗어났다: "${raw}"`);
+      }
+      const tenths = Math.round(val * 10);
+      return `${tenths}${hemi}`;
+    }
+
+    function validateStage(stage) {
+      if (typeof stage !== "string") {
+        throw new Error(`stage는 문자열이어야 한다: ${String(stage)}`);
+      }
+      const norm = stage.trim().toLowerCase();
+      if (!ALLOWED_STAGES.has(norm)) {
+        throw new Error(`허용되지 않은 stage 값이다: "${stage}"`);
+      }
+      return norm;
+    }
+
+    function mapTypeCode(category, stageNorm, speed) {
+      if (stageNorm === "extratropical cyclone") {
+        return "EX";
+      }
+      if (stageNorm === "subtropical cyclone") {
+        return typeof speed === "number" && speed >= 34 ? "SS" : "SD";
+      }
+
+      const cat = String(category ?? "").trim().toLowerCase();
+      if (cat.includes("super") && cat.includes("typhoon")) return "STY";
+      if (cat.includes("typhoon")) return "TY";
+      if (cat.includes("tropical storm") || cat === "ts") return "TS";
+      if (cat.includes("depression") || cat === "td") return "TD";
+      if (cat.includes("disturbance") || cat.includes("invest")) return "DB";
+      if (cat.includes("low")) return "LO";
+
+      if (typeof speed === "number" && Number.isFinite(speed)) {
+        if (speed >= 130) return "STY";
+        if (speed >= 64) return "TY";
+        if (speed >= 34) return "TS";
+        return "TD";
+      }
+      throw new Error(`알 수 없는 category 값이다: "${category}"`);
+    }
+
+    function resolveDtg(point, fallbackDtg, stepHoursToAdd) {
+      parseDtgToUtcDate(fallbackDtg);
+      const d = point.date;
+      const t = point.time;
+
+      if (d === null && t === null) {
+        return addHoursToDtg(fallbackDtg, stepHoursToAdd);
+      }
+
+      if (typeof d === "string" && d.trim() !== "") {
+        const digitsDate = d.replace(/\D/g, "");
+        if (digitsDate.length === 10) {
+          return addHoursToDtg(digitsDate, stepHoursToAdd);
+        }
+        if (digitsDate.length === 8) {
+          const digitsTime = typeof t === "string" ? t.replace(/\D/g, "").padStart(2, "0").slice(0, 2) : "00";
+          return addHoursToDtg(`${digitsDate}${digitsTime}`, stepHoursToAdd);
+        }
+      }
+
+      throw new Error(`유효하지 않은 date/time 조합이다: date=${String(d)}, time=${String(t)}`);
+    }
+
+    function convertJsonToAtcf() {
+      try {
+        if (!jsonInput.value.trim()) {
+          throw new Error("JSON 입력창이 비어 있다.");
+        }
+
+        const basin = document.getElementById("basin").value.trim().toUpperCase();
+        const stormNumRaw = document.getElementById("stormNum").value.trim();
+        const defaultDtg = document.getElementById("defaultDtg").value.trim();
+        const tauStepRaw = Number(document.getElementById("tauStep").value);
+        const tech = document.getElementById("tech").value.trim().toUpperCase() || "JTWC";
+
+        if (!/^[A-Z]{2}$/.test(basin)) {
+          throw new Error("BASIN은 대문자 2글자여야 한다 (예: WP).");
+        }
+        if (!/^\d{1,2}$/.test(stormNumRaw)) {
+          throw new Error("STORM NUM은 1~2자리 숫자여야 한다 (예: 04).");
+        }
+        if (!Number.isInteger(tauStepRaw) || tauStepRaw < 0 || tauStepRaw > 168) {
+          throw new Error("TAU STEP은 0 이상 168 이하의 정수여야 한다.");
+        }
+        const stormNum = stormNumRaw.padStart(2, "0");
+
+        const parsed = JSON.parse(jsonInput.value);
+        if (!parsed || !Array.isArray(parsed.tracks) || parsed.tracks.length === 0) {
+          throw new Error("JSON 최상위에 비어 있지 않은 tracks 배열이 있어야 한다.");
+        }
+
+        const lines = [];
+
+        parsed.tracks.forEach((track, tIdx) => {
+          if (!Array.isArray(track) || track.length === 0) {
+            throw new Error(`tracks[${tIdx}]는 비어 있지 않은 배열이어야 한다.`);
+          }
+          track.forEach((pt, pIdx) => {
+            if (!pt || typeof pt !== "object") {
+              throw new Error(`tracks[${tIdx}][${pIdx}]는 객체여야 한다.`);
+            }
+            if (typeof pt.speed !== "number" || !Number.isFinite(pt.speed)) {
+              throw new Error(`tracks[${tIdx}][${pIdx}].speed는 숫자여야 한다.`);
+            }
+            if (typeof pt.pressure !== "number" || !Number.isFinite(pt.pressure)) {
+              throw new Error(`tracks[${tIdx}][${pIdx}].pressure는 숫자여야 한다.`);
+            }
+
+            const stageNorm = validateStage(pt.stage);
+            const stepHoursToAdd = pIdx * tauStepRaw;
+            const dtg = resolveDtg(pt, defaultDtg, stepHoursToAdd);
+            const latStr = normalizeCoord(pt.latitude, ["N", "S"]);
+            const lonStr = normalizeCoord(pt.longitude, ["E", "W"]);
+            const vmax = Math.round(pt.speed);
+            const mslp = Math.round(pt.pressure);
+            const ty = mapTypeCode(pt.category, stageNorm, pt.speed);
+
+            const line = [
+              basin,
+              stormNum,
+              dtg,
+              FIXED_TAU,
+              tech,
+              "000",
+              latStr,
+              lonStr,
+              String(vmax),
+              String(mslp),
+              ty
+            ].join(", ");
+
+            lines.push(line);
+          });
+        });
+
+        atcfBox.value = lines.join("\n");
+        setStatus(`변환 완료: 총 ${lines.length}개 ATCF 레코드 생성됨 (TAU: 00 고정).`, "ok");
+      } catch (err) {
+        setStatus(`변환 거부됨 — ${err.message}`, "error");
+      }
+    }
+
+    document.getElementById("convertBtn").addEventListener("click", convertJsonToAtcf);
+
+    document.getElementById("clearJsonBtn").addEventListener("click", () => {
+      jsonInput.value = "";
+      setStatus("JSON 입력창을 비웠다.");
+    });
+
+    document.getElementById("clearAtcfBtn").addEventListener("click", () => {
+      atcfBox.value = "";
+      setStatus("ATCF 입력창을 비웠다.");
+    });
+
+    document.getElementById("copyAtcfBtn").addEventListener("click", async () => {
+      if (!atcfBox.value.trim()) {
+        setStatus("복사할 ATCF 내용이 없다.", "error");
+        return;
+      }
+      await navigator.clipboard.writeText(atcfBox.value);
+      setStatus("ATCF 내용을 클립보드에 복사했다.", "ok");
+    });
+
+    document.getElementById("downloadAtcfBtn").addEventListener("click", () => {
+      if (!atcfBox.value.trim()) {
+        setStatus("다운로드할 ATCF 내용이 없다.", "error");
+        return;
+      }
+      const blob = new Blob([atcfBox.value + "\n"], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "track.atcf";
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus("track.atcf 파일을 다운로드했다.", "ok");
+    });
+  </script>
+</body>
+</html>
