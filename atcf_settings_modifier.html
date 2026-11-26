@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATCF 설정 수정기</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #0b1120;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #f87171;
+      --ok: #4ade80;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+
+    .card-title {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .grid-required {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-size: 0.92rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    textarea#atcfInput {
+      min-height: 240px;
+      resize: vertical;
+      line-height: 1.55;
+      tab-size: 4;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      background: var(--accent);
+      color: #061220;
+      border: none;
+      border-radius: 6px;
+      padding: 9px 14px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+      color: #ffffff;
+    }
+
+    button.secondary {
+      background: #334155;
+      color: var(--text);
+    }
+
+    button.secondary:hover {
+      background: #475569;
+    }
+
+    button.danger {
+      background: #7f1d1d;
+      color: #fecaca;
+    }
+
+    button.danger:hover {
+      background: #991b1b;
+    }
+
+    .status-bar {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      min-height: 1.2em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .status-ok {
+      color: var(--ok);
+    }
+
+    .status-err {
+      color: var(--danger);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 7px 9px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background: var(--panel-2);
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>ATCF 설정 수정기</h1>
+        <div class="subtitle">입력한 전체 ATCF 데이터에 분지, 폭풍 번호, FALLBACK DTG, TAU STEP, TECH 일괄 적용</div>
+      </div>
+      <div class="subtitle">예시: WP, 23, 2030112206, 00, JTWC, 000, 116N, 1467E, 20, 1009, EX</div>
+    </header>
+
+    <section class="card">
+      <h2 class="card-title">수정 설정값</h2>
+      <div class="grid-required">
+        <div class="field">
+          <label for="basin">분지 (BASIN)</label>
+          <select id="basin">
+            <option value="WP" selected>WP</option>
+            <option value="AL">AL</option>
+            <option value="EP">EP</option>
+            <option value="CP">CP</option>
+            <option value="IO">IO</option>
+            <option value="SH">SH</option>
+            <option value="SL">SL</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="stormNum">폭풍 번호 (STORM NUM, 2자리)</label>
+          <input id="stormNum" type="text" maxlength="2" value="23" placeholder="01~99" />
+        </div>
+
+        <div class="field">
+          <label for="fallbackDtg">FALLBACK DTG (YYYYMMDDHH)</label>
+          <input id="fallbackDtg" type="text" maxlength="10" value="2030112206" placeholder="YYYYMMDDHH" />
+        </div>
+
+        <div class="field">
+          <label for="tauStep">TAU STEP (시간 간격)</label>
+          <input id="tauStep" type="number" min="0" max="168" step="1" value="6" />
+        </div>
+
+        <div class="field">
+          <label for="tech">TECH (5번째 항목)</label>
+          <input id="tech" type="text" value="JTWC" placeholder="예: JTWC" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="btnApply">수정사항 적용</button>
+        <button type="button" id="btnCopy" class="secondary">복사</button>
+        <button type="button" id="btnDownload" class="secondary">.DAT 다운로드</button>
+        <button type="button" id="btnClear" class="danger">입력창 비우기</button>
+      </div>
+
+      <div id="statusBar" class="status-bar"></div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">ATCF 입력창 (전체 코드 입력)</h2>
+      <textarea id="atcfInput" placeholder=""></textarea>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">미리보기</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>BASIN (1)</th>
+              <th>STORM NUM (2)</th>
+              <th>DTG (3)</th>
+              <th>TAU (4)</th>
+              <th>TECH (5)</th>
+              <th>6</th>
+              <th>7</th>
+              <th>8</th>
+              <th>9</th>
+              <th>10</th>
+              <th>11</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = {
+      basin: document.getElementById("basin"),
+      stormNum: document.getElementById("stormNum"),
+      fallbackDtg: document.getElementById("fallbackDtg"),
+      tauStep: document.getElementById("tauStep"),
+      tech: document.getElementById("tech"),
+      atcfInput: document.getElementById("atcfInput"),
+      previewBody: document.getElementById("previewBody"),
+      statusBar: document.getElementById("statusBar"),
+      btnApply: document.getElementById("btnApply"),
+      btnCopy: document.getElementById("btnCopy"),
+      btnDownload: document.getElementById("btnDownload"),
+      btnClear: document.getElementById("btnClear")
+    };
+
+    // 초기 진입 시 ATCF 입력창은 반드시 비워둠
+    el.atcfInput.value = "";
+
+    function setStatus(msg, isError = false) {
+      el.statusBar.textContent = msg;
+      el.statusBar.className = "status-bar " + (isError ? "status-err" : "status-ok");
+    }
+
+    function pad2(num) {
+      return String(num).padStart(2, "0");
+    }
+
+    function addHoursToDtg(dtgStr, addHours) {
+      if (!/^\d{10}$/.test(dtgStr)) return null;
+      const year = Number(dtgStr.slice(0, 4));
+      const month = Number(dtgStr.slice(4, 6)) - 1;
+      const day = Number(dtgStr.slice(6, 8));
+      const hour = Number(dtgStr.slice(8, 10));
+
+      const date = new Date(Date.UTC(year, month, day, hour, 0, 0));
+      if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month ||
+        date.getUTCDate() !== day ||
+        date.getUTCHours() !== hour
+      ) {
+        return null;
+      }
+
+      date.setUTCHours(date.getUTCHours() + Number(addHours));
+      const y = date.getUTCFullYear();
+      const m = pad2(date.getUTCMonth() + 1);
+      const d = pad2(date.getUTCDate());
+      const h = pad2(date.getUTCHours());
+      return `${y}${m}${d}${h}`;
+    }
+
+    function getConfig() {
+      const basin = el.basin.value.trim().toUpperCase();
+      const stormRaw = el.stormNum.value.trim();
+      const dtg = el.fallbackDtg.value.trim();
+      const step = Number(el.tauStep.value);
+      const tech = el.tech.value.trim();
+
+      if (!/^[A-Z]{2}$/.test(basin)) {
+        return { error: "분지(BASIN)는 영문 2자리여야 합니다. (예: WP)" };
+      }
+      if (!/^\d{1,2}$/.test(stormRaw)) {
+        return { error: "폭풍 번호(STORM NUM)는 2자리 숫자여야 합니다. (예: 23)" };
+      }
+      if (!/^\d{10}$/.test(dtg) || !addHoursToDtg(dtg, 0)) {
+        return { error: "FALLBACK DTG는 유효한 YYYYMMDDHH 10자리 숫자여야 합니다." };
+      }
+      if (!Number.isInteger(step) || step < 0) {
+        return { error: "TAU STEP은 0 이상의 정수 시간 간격이어야 합니다." };
+      }
+      if (!tech) {
+        return { error: "TECH(5번째 항목) 값을 입력해야 합니다." };
+      }
+
+      return {
+        basin,
+        stormNum: pad2(Number(stormRaw)),
+        dtg,
+        step,
+        tech
+      };
+    }
+
+    function applyModifications() {
+      const cfg = getConfig();
+      if (cfg.error) {
+        setStatus(cfg.error, true);
+        return;
+      }
+
+      const lines = el.atcfInput.value.split(/\r?\n/);
+      let modifiedCount = 0;
+      let nonEmptyIndex = 0;
+
+      const updated = lines.map(rawLine => {
+        if (!rawLine.trim()) return rawLine;
+
+        const cols = rawLine.split(",");
+        if (cols.length < 5) {
+          return rawLine;
+        }
+
+        const addedHours = nonEmptyIndex * cfg.step;
+        const nextDtg = addHoursToDtg(cfg.dtg, addedHours);
+
+        cols[0] = cfg.basin;
+        cols[1] = ` ${cfg.stormNum}`;
+        cols[2] = ` ${nextDtg}`;
+        cols[4] = ` ${cfg.tech}`;
+
+        nonEmptyIndex++;
+        modifiedCount++;
+        return cols.join(",");
+      });
+
+      el.atcfInput.value = updated.join("\n");
+      renderPreview();
+      setStatus(`전체 ATCF 코드 중 ${modifiedCount}개 줄 수정 완료 (FALLBACK DTG: ${cfg.dtg}, TAU STEP: ${cfg.step}h)`);
+    }
+
+    function renderPreview() {
+      const lines = el.atcfInput.value
+        .split(/\r?\n/)
+        .filter(l => l.trim().length > 0);
+
+      el.previewBody.innerHTML = "";
+      lines.forEach((line, idx) => {
+        const cols = line.split(",").map(c => c.trim());
+        const tr = document.createElement("tr");
+        const cells = [
+          idx + 1,
+          cols[0] ?? "",
+          cols[1] ?? "",
+          cols[2] ?? "",
+          cols[3] ?? "",
+          cols[4] ?? "",
+          cols[5] ?? "",
+          cols[6] ?? "",
+          cols[7] ?? "",
+          cols[8] ?? "",
+          cols[9] ?? "",
+          cols[10] ?? ""
+        ];
+        cells.forEach(val => {
+          const td = document.createElement("td");
+          td.textContent = val;
+          tr.appendChild(td);
+        });
+        el.previewBody.appendChild(tr);
+      });
+    }
+
+    el.btnApply.addEventListener("click", applyModifications);
+
+    el.btnCopy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(el.atcfInput.value);
+        setStatus("클립보드에 복사되었습니다.");
+      } catch {
+        setStatus("클립보드 복사에 실패했습니다.", true);
+      }
+    });
+
+    el.btnDownload.addEventListener("click", () => {
+      const cfg = getConfig();
+      const fileName = cfg.error
+        ? "atcf_modified.dat"
+        : `${cfg.basin.toLowerCase()}${cfg.stormNum}_${cfg.dtg}.dat`;
+      const blob = new Blob([el.atcfInput.value], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus(`${fileName} 다운로드 완료`);
+    });
+
+    el.btnClear.addEventListener("click", () => {
+      el.atcfInput.value = "";
+      renderPreview();
+      setStatus("입력창을 비웠습니다.");
+    });
+
+    el.atcfInput.addEventListener("input", renderPreview);
+    renderPreview();
+  </script>
+</body>
+</html>
